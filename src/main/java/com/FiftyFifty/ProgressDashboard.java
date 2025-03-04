@@ -11,29 +11,38 @@ import java.awt.event.WindowEvent;
 import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 import javax.inject.Inject;
 import javax.swing.BorderFactory;
+import javax.swing.BoxLayout;
+import javax.swing.DefaultComboBoxModel;
 import javax.swing.JButton;
 import javax.swing.JComboBox;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
-import javax.swing.JProgressBar;
 import javax.swing.JScrollPane;
 import javax.swing.JTabbedPane;
 import javax.swing.JTable;
+import javax.swing.ListSelectionModel;
+import javax.swing.RowFilter;
 import javax.swing.SwingConstants;
-import javax.swing.SwingUtilities;
 import javax.swing.WindowConstants;
+import javax.swing.border.EmptyBorder;
 import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.DefaultTableModel;
+import javax.swing.table.TableRowSorter;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.client.config.ConfigManager;
 import net.runelite.client.ui.ColorScheme;
+import net.runelite.client.ui.DynamicGridLayout;
 import net.runelite.client.ui.FontManager;
-import net.runelite.client.ui.PluginPanel;
+import net.runelite.client.ui.components.ColorJButton;
+import net.runelite.client.ui.components.ProgressBar;
+import net.runelite.client.ui.components.shadowlabel.JShadowedLabel;
 
 @Slf4j
 public class ProgressDashboard extends JFrame
@@ -43,19 +52,24 @@ public class ProgressDashboard extends JFrame
     
     private boolean isOpen = false;
     
-    private static final int DASHBOARD_WIDTH = 400;
-    private static final int DASHBOARD_HEIGHT = 600;
+    private static final int DASHBOARD_WIDTH = 500;
+    private static final int DASHBOARD_HEIGHT = 650;
     
-    @Inject
+    // Table model for all monsters
+    private DefaultTableModel tableModel;
+    private TableRowSorter<DefaultTableModel> tableSorter;
+    
     public ProgressDashboard(EnemyKillTracker killTracker, ConfigManager configManager)
     {
         this.killTracker = killTracker;
         this.configManager = configManager;
         
-        setTitle("Kill Progress Dashboard");
+        setTitle("Fifty-Fifty Progress Dashboard");
         setDefaultCloseOperation(WindowConstants.DISPOSE_ON_CLOSE);
         setSize(DASHBOARD_WIDTH, DASHBOARD_HEIGHT);
         setLocationRelativeTo(null);
+        
+        setBackground(ColorScheme.DARK_GRAY_COLOR);
         
         addWindowListener(new WindowAdapter()
         {
@@ -78,11 +92,18 @@ public class ProgressDashboard extends JFrame
         
         isOpen = true;
         
+        // Create tabbed pane with RuneLite styling
         JTabbedPane tabbedPane = new JTabbedPane();
+        tabbedPane.setBackground(ColorScheme.DARKER_GRAY_COLOR);
+        tabbedPane.setForeground(Color.WHITE);
+        tabbedPane.setBorder(null);
+        
+        // Add tabs
         tabbedPane.add("In Progress", createProgressPanel());
         tabbedPane.add("All Monsters", createAllMonstersPanel());
         tabbedPane.add("Statistics", createStatsPanel());
         
+        getContentPane().setBackground(ColorScheme.DARK_GRAY_COLOR);
         getContentPane().add(tabbedPane);
         
         pack();
@@ -91,39 +112,48 @@ public class ProgressDashboard extends JFrame
     
     private JPanel createProgressPanel()
     {
-        JPanel panel = new JPanel(new BorderLayout());
+        JPanel panel = new JPanel(new BorderLayout(0, 10));
+        panel.setBackground(ColorScheme.DARK_GRAY_COLOR);
+        panel.setBorder(new EmptyBorder(10, 10, 10, 10));
         panel.setPreferredSize(new Dimension(DASHBOARD_WIDTH - 20, DASHBOARD_HEIGHT - 80));
-        panel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+        
+        // Add header
+        JShadowedLabel headerLabel = new JShadowedLabel("Monsters In Progress");
+        headerLabel.setFont(FontManager.getRunescapeBoldFont());
+        headerLabel.setForeground(Color.WHITE);
+        headerLabel.setHorizontalAlignment(SwingConstants.CENTER);
+        panel.add(headerLabel, BorderLayout.NORTH);
         
         // Get all kills
         Map<String, Integer> allKills = killTracker.getAllKills();
         
         // Track monsters in progress
-        List<MobProgress> inProgress = new ArrayList<>();
-        
-        for (Map.Entry<String, Integer> entry : allKills.entrySet())
-        {
-            String mobName = entry.getKey();
-            int kills = entry.getValue();
-            int threshold = NpcKillThreshold.getThreshold(mobName);
-            
-            if (kills > 0 && kills < threshold)
-            {
-                inProgress.add(new MobProgress(mobName, kills, threshold));
-            }
-        }
-        
-        // Sort by progress percentage (descending)
-        Collections.sort(inProgress);
+        List<MobProgress> inProgress = allKills.entrySet().stream()
+            .filter(entry -> {
+                int threshold = NpcKillThreshold.getThreshold(entry.getKey());
+                return entry.getValue() > 0 && entry.getValue() < threshold;
+            })
+            .map(entry -> new MobProgress(
+                entry.getKey(), 
+                entry.getValue(), 
+                NpcKillThreshold.getThreshold(entry.getKey())
+            ))
+            .sorted(Comparator.comparing(MobProgress::getProgress).reversed())
+            .collect(Collectors.toList());
         
         // Create in-progress panel
         JPanel progressCardsPanel = new JPanel();
-        progressCardsPanel.setLayout(new GridLayout(0, 1, 0, 10));
+        progressCardsPanel.setLayout(new BoxLayout(progressCardsPanel, BoxLayout.Y_AXIS));
+        progressCardsPanel.setBackground(ColorScheme.DARK_GRAY_COLOR);
+        progressCardsPanel.setBorder(new EmptyBorder(0, 0, 0, 0));
         
         if (inProgress.isEmpty())
         {
-            JLabel emptyLabel = new JLabel("No monsters in progress", SwingConstants.CENTER);
+            JShadowedLabel emptyLabel = new JShadowedLabel("No monsters in progress");
             emptyLabel.setFont(FontManager.getRunescapeFont());
+            emptyLabel.setForeground(Color.LIGHT_GRAY);
+            emptyLabel.setHorizontalAlignment(SwingConstants.CENTER);
+            emptyLabel.setAlignmentX(JLabel.CENTER_ALIGNMENT);
             progressCardsPanel.add(emptyLabel);
         }
         else
@@ -131,63 +161,120 @@ public class ProgressDashboard extends JFrame
             for (MobProgress mob : inProgress)
             {
                 progressCardsPanel.add(createProgressCard(mob));
+                progressCardsPanel.add(createSpacerPanel(5));
             }
         }
         
         JScrollPane scrollPane = new JScrollPane(progressCardsPanel);
-        scrollPane.setBorder(BorderFactory.createEmptyBorder());
+        scrollPane.setBackground(ColorScheme.DARK_GRAY_COLOR);
+        scrollPane.getVerticalScrollBar().setPreferredSize(new Dimension(16, 0));
+        scrollPane.getVerticalScrollBar().setBorder(new EmptyBorder(0, 0, 0, 0));
+        scrollPane.setBorder(
+            BorderFactory.createCompoundBorder(
+                BorderFactory.createMatteBorder(1, 1, 1, 1, ColorScheme.DARKER_GRAY_COLOR),
+                BorderFactory.createEmptyBorder(5, 5, 5, 5)
+            )
+        );
         
         panel.add(scrollPane, BorderLayout.CENTER);
         
         return panel;
     }
     
+    private JPanel createSpacerPanel(int height)
+    {
+        JPanel spacer = new JPanel();
+        spacer.setBackground(ColorScheme.DARK_GRAY_COLOR);
+        spacer.setPreferredSize(new Dimension(0, height));
+        spacer.setMinimumSize(new Dimension(0, height));
+        spacer.setMaximumSize(new Dimension(Short.MAX_VALUE, height));
+        spacer.setAlignmentX(JPanel.LEFT_ALIGNMENT);
+        return spacer;
+    }
+    
     private JPanel createProgressCard(MobProgress mob)
     {
         JPanel card = new JPanel(new BorderLayout(5, 5));
         card.setBorder(BorderFactory.createCompoundBorder(
-            BorderFactory.createLineBorder(ColorScheme.DARKER_GRAY_COLOR),
-            BorderFactory.createEmptyBorder(5, 5, 5, 5)
+            BorderFactory.createMatteBorder(1, 1, 1, 1, ColorScheme.DARKER_GRAY_COLOR),
+            BorderFactory.createEmptyBorder(7, 7, 7, 7)
         ));
         card.setBackground(ColorScheme.DARKER_GRAY_HOVER_COLOR);
+        card.setAlignmentX(JPanel.LEFT_ALIGNMENT);
+        card.setMaximumSize(new Dimension(Short.MAX_VALUE, 85));
         
-        // Title
-        JLabel nameLabel = new JLabel(mob.getName());
+        // Header panel with name and percentage
+        JPanel headerPanel = new JPanel(new BorderLayout(5, 0));
+        headerPanel.setBackground(ColorScheme.DARKER_GRAY_HOVER_COLOR);
+        
+        // Monster name
+        JShadowedLabel nameLabel = new JShadowedLabel(mob.getName());
         nameLabel.setFont(FontManager.getRunescapeBoldFont());
         nameLabel.setForeground(Color.WHITE);
-        card.add(nameLabel, BorderLayout.NORTH);
-        
-        // Progress bar
-        JProgressBar progressBar = new JProgressBar(0, mob.getThreshold());
-        progressBar.setValue(mob.getKills());
-        float percentage = (float) mob.getKills() / mob.getThreshold();
-        
-        // Color based on progress
-        if (percentage < 0.3)
-            progressBar.setForeground(new Color(255, 60, 60)); // Red
-        else if (percentage < 0.7)
-            progressBar.setForeground(new Color(255, 140, 0)); // Orange
-        else
-            progressBar.setForeground(new Color(0, 180, 0));   // Green
-            
-        progressBar.setStringPainted(true);
-        progressBar.setString(mob.getKills() + " / " + mob.getThreshold());
-        card.add(progressBar, BorderLayout.CENTER);
+        headerPanel.add(nameLabel, BorderLayout.WEST);
         
         // Percentage
-        DecimalFormat df = new DecimalFormat("#.##%");
-        JLabel percentLabel = new JLabel(df.format(percentage), SwingConstants.RIGHT);
+        float percentage = mob.getProgress();
+        DecimalFormat df = new DecimalFormat("#.#%");
+        JShadowedLabel percentLabel = new JShadowedLabel(df.format(percentage));
         percentLabel.setFont(FontManager.getRunescapeSmallFont());
-        card.add(percentLabel, BorderLayout.EAST);
+        percentLabel.setForeground(getColorForPercentage(percentage));
+        headerPanel.add(percentLabel, BorderLayout.EAST);
+        
+        card.add(headerPanel, BorderLayout.NORTH);
+        
+        // Progress info
+        JPanel infoPanel = new JPanel(new BorderLayout(5, 0));
+        infoPanel.setBackground(ColorScheme.DARKER_GRAY_HOVER_COLOR);
+        
+        // Kill count info
+        JShadowedLabel killsLabel = new JShadowedLabel(mob.getKills() + " / " + mob.getThreshold() + " kills");
+        killsLabel.setFont(FontManager.getRunescapeSmallFont());
+        killsLabel.setForeground(Color.LIGHT_GRAY);
+        infoPanel.add(killsLabel, BorderLayout.WEST);
+        
+        // Remaining kills
+        int remaining = mob.getThreshold() - mob.getKills();
+        JShadowedLabel remainingLabel = new JShadowedLabel(remaining + " remaining");
+        remainingLabel.setFont(FontManager.getRunescapeSmallFont());
+        remainingLabel.setForeground(Color.LIGHT_GRAY);
+        infoPanel.add(remainingLabel, BorderLayout.EAST);
+        
+        card.add(infoPanel, BorderLayout.CENTER);
+        
+        // Progress bar
+        ProgressBar progressBar = new ProgressBar();
+        progressBar.setMaximumValue(mob.getThreshold());
+        progressBar.setValue(mob.getKills());
+        progressBar.setBackground(ColorScheme.DARKER_GRAY_COLOR);
+        progressBar.setForeground(getColorForPercentage(percentage));
+        
+        card.add(progressBar, BorderLayout.SOUTH);
         
         return card;
     }
     
+    private Color getColorForPercentage(float percentage)
+    {
+        if (percentage >= 1.0f) {
+            return Color.RED;  // Maxed out - red
+        } else if (percentage >= 0.75f) {
+            return Color.decode("#aeff00");  // Light green
+        } else if (percentage >= 0.5f) {
+            return Color.decode("#ffe500");  // Yellow
+        } else if (percentage >= 0.25f) {
+            return Color.decode("#ffb600");  // Orange
+        } else {
+            return Color.decode("#ea6600");  // Dark orange
+        }
+    }
+    
     private JPanel createAllMonstersPanel()
     {
-        JPanel panel = new JPanel(new BorderLayout());
+        JPanel panel = new JPanel(new BorderLayout(0, 10));
+        panel.setBackground(ColorScheme.DARK_GRAY_COLOR);
+        panel.setBorder(new EmptyBorder(10, 10, 10, 10));
         panel.setPreferredSize(new Dimension(DASHBOARD_WIDTH - 20, DASHBOARD_HEIGHT - 80));
-        panel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
         
         // Create column names
         String[] columnNames = {"Monster", "Kills", "Required", "Progress"};
@@ -212,14 +299,14 @@ public class ProgressDashboard extends JFrame
             
             // Calculate percentage
             float percentage = (float) kills / threshold;
-            DecimalFormat df = new DecimalFormat("#.##%");
+            DecimalFormat df = new DecimalFormat("#.#%");
             data[i][3] = df.format(percentage);
             
             i++;
         }
         
         // Create table model
-        DefaultTableModel model = new DefaultTableModel(data, columnNames)
+        tableModel = new DefaultTableModel(data, columnNames)
         {
             @Override
             public boolean isCellEditable(int row, int column)
@@ -239,70 +326,83 @@ public class ProgressDashboard extends JFrame
         };
         
         // Create table
-        JTable table = new JTable(model);
+        JTable table = new JTable(tableModel);
         table.setRowHeight(25);
         table.setFont(FontManager.getRunescapeSmallFont());
         table.getTableHeader().setReorderingAllowed(false);
+        table.getTableHeader().setBackground(ColorScheme.DARKER_GRAY_COLOR);
+        table.getTableHeader().setForeground(Color.WHITE);
+        table.getTableHeader().setFont(FontManager.getRunescapeBoldFont());
+        table.setBackground(ColorScheme.DARKER_GRAY_COLOR);
+        table.setForeground(Color.WHITE);
+        table.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+        table.setGridColor(ColorScheme.DARK_GRAY_COLOR);
         
         // Center-align numeric columns
         DefaultTableCellRenderer centerRenderer = new DefaultTableCellRenderer();
         centerRenderer.setHorizontalAlignment(JLabel.CENTER);
+        centerRenderer.setBackground(ColorScheme.DARKER_GRAY_COLOR);
+        centerRenderer.setForeground(Color.WHITE);
+        
         table.getColumnModel().getColumn(1).setCellRenderer(centerRenderer);
         table.getColumnModel().getColumn(2).setCellRenderer(centerRenderer);
         table.getColumnModel().getColumn(3).setCellRenderer(centerRenderer);
         
-        // Sortable (click on column header)
-        table.setAutoCreateRowSorter(true);
+        // Setup sorter
+        tableSorter = new TableRowSorter<>(tableModel);
+        table.setRowSorter(tableSorter);
         
+        // Add the table to a scroll pane
         JScrollPane scrollPane = new JScrollPane(table);
-        scrollPane.setBorder(BorderFactory.createEmptyBorder());
+        scrollPane.setBackground(ColorScheme.DARK_GRAY_COLOR);
+        scrollPane.getVerticalScrollBar().setPreferredSize(new Dimension(16, 0));
+        scrollPane.setBorder(
+            BorderFactory.createCompoundBorder(
+                BorderFactory.createMatteBorder(1, 1, 1, 1, ColorScheme.DARKER_GRAY_COLOR),
+                BorderFactory.createEmptyBorder(5, 5, 5, 5)
+            )
+        );
         
         // Filter controls
         JPanel filterPanel = new JPanel(new BorderLayout(5, 0));
-        filterPanel.setBorder(BorderFactory.createEmptyBorder(0, 0, 10, 0));
+        filterPanel.setBackground(ColorScheme.DARK_GRAY_COLOR);
+        filterPanel.setBorder(new EmptyBorder(0, 0, 10, 0));
         
-        JLabel filterLabel = new JLabel("Filter: ");
+        JShadowedLabel filterLabel = new JShadowedLabel("Filter: ");
         filterLabel.setFont(FontManager.getRunescapeSmallFont());
+        filterLabel.setForeground(Color.WHITE);
         
         String[] filterOptions = {"All", "In Progress", "Completed", "Not Started"};
-        JComboBox<String> filterBox = new JComboBox<>(filterOptions);
+        JComboBox<String> filterBox = new JComboBox<>(new DefaultComboBoxModel<>(filterOptions));
+        filterBox.setFocusable(false);
+        filterBox.setBackground(ColorScheme.DARKER_GRAY_COLOR);
+        filterBox.setForeground(Color.WHITE);
+        filterBox.setFont(FontManager.getRunescapeSmallFont());
+        
         filterBox.addActionListener((ActionEvent e) -> {
             String selection = (String) filterBox.getSelectedItem();
-            DefaultTableModel tableModel = (DefaultTableModel) table.getModel();
-            tableModel.setRowCount(0);
             
-            for (Map.Entry<String, Integer> entry : thresholds.entrySet())
-            {
-                String mobName = entry.getKey();
-                int threshold = entry.getValue();
-                int kills = allKills.getOrDefault(mobName, 0);
-                
-                boolean include = false;
-                
-                switch (selection)
-                {
-                    case "All":
-                        include = true;
-                        break;
-                    case "In Progress":
-                        include = kills > 0 && kills < threshold;
-                        break;
-                    case "Completed":
-                        include = kills >= threshold;
-                        break;
-                    case "Not Started":
-                        include = kills == 0;
-                        break;
-                }
-                
-                if (include)
-                {
-                    float percentage = (float) kills / threshold;
-                    DecimalFormat df = new DecimalFormat("#.##%");
-                    tableModel.addRow(new Object[]{
-                        mobName, kills, threshold, df.format(percentage)
-                    });
-                }
+            if (selection.equals("All")) {
+                tableSorter.setRowFilter(null);
+            } else {
+                tableSorter.setRowFilter(new RowFilter<DefaultTableModel, Integer>() {
+                    @Override
+                    public boolean include(Entry<? extends DefaultTableModel, ? extends Integer> entry) {
+                        int kills = (Integer) entry.getModel().getValueAt(entry.getIdentifier(), 1);
+                        int threshold = (Integer) entry.getModel().getValueAt(entry.getIdentifier(), 2);
+                        
+                        switch (selection) {
+                            case "In Progress":
+                                return kills > 0 && kills < threshold;
+                            case "Completed":
+                                return kills >= threshold;
+                            case "Not Started":
+                                return kills == 0;
+                            default:
+                                return true;
+                        }
+                    }
+                });
             }
         });
         
@@ -317,12 +417,28 @@ public class ProgressDashboard extends JFrame
     
     private JPanel createStatsPanel()
     {
-        JPanel panel = new JPanel(new BorderLayout());
+        JPanel panel = new JPanel(new BorderLayout(0, 10));
+        panel.setBackground(ColorScheme.DARK_GRAY_COLOR);
+        panel.setBorder(new EmptyBorder(10, 10, 10, 10));
         panel.setPreferredSize(new Dimension(DASHBOARD_WIDTH - 20, DASHBOARD_HEIGHT - 80));
-        panel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
         
-        JPanel statsPanel = new JPanel(new GridLayout(0, 1, 0, 10));
-        statsPanel.setBorder(BorderFactory.createEmptyBorder(0, 0, 10, 0));
+        // Header
+        JShadowedLabel headerLabel = new JShadowedLabel("Statistics");
+        headerLabel.setFont(FontManager.getRunescapeBoldFont());
+        headerLabel.setForeground(Color.WHITE);
+        headerLabel.setHorizontalAlignment(SwingConstants.CENTER);
+        panel.add(headerLabel, BorderLayout.NORTH);
+        
+        // Stats content panel
+        JPanel statsPanel = new JPanel();
+        statsPanel.setLayout(new DynamicGridLayout(0, 1, 0, 8));
+        statsPanel.setBackground(ColorScheme.DARK_GRAY_COLOR);
+        statsPanel.setBorder(
+            BorderFactory.createCompoundBorder(
+                BorderFactory.createMatteBorder(1, 1, 1, 1, ColorScheme.DARKER_GRAY_COLOR),
+                BorderFactory.createEmptyBorder(10, 10, 10, 10)
+            )
+        );
         
         // Gather stats
         Map<String, Integer> allKills = killTracker.getAllKills();
@@ -370,40 +486,57 @@ public class ProgressDashboard extends JFrame
         }
         
         // Calculate overall progress
-        float overallProgress = (float) totalCompleted / thresholds.size();
+        float overallProgress = thresholds.size() > 0 ? (float) totalCompleted / thresholds.size() : 0;
         
         // Add stats
         addStatRow(statsPanel, "Total Monsters Tracked", String.valueOf(thresholds.size()));
         addStatRow(statsPanel, "Total Kill Count", String.valueOf(totalKills));
         addStatRow(statsPanel, "Completed Monsters", totalCompleted + " (" + 
-            new DecimalFormat("#.##%").format(overallProgress) + ")");
+            new DecimalFormat("#.#%").format(overallProgress) + ")");
         addStatRow(statsPanel, "In Progress", String.valueOf(totalInProgress));
         addStatRow(statsPanel, "Not Started", String.valueOf(totalNotStarted));
-        addStatRow(statsPanel, "Most Killed Enemy", mostKilled + " (" + mostKillCount + " kills)");
+        
+        if (!mostKilled.equals("None")) {
+            addStatRow(statsPanel, "Most Killed Enemy", mostKilled + " (" + mostKillCount + " kills)");
+        }
+        
+        // Overall progress bar
+        statsPanel.add(createSpacerPanel(10));
+        
+        JShadowedLabel progressLabel = new JShadowedLabel("Overall Completion");
+        progressLabel.setFont(FontManager.getRunescapeBoldFont());
+        progressLabel.setForeground(Color.WHITE);
+        statsPanel.add(progressLabel);
+        
+        ProgressBar progressBar = new ProgressBar();
+        progressBar.setMaximumValue(thresholds.size());
+        progressBar.setValue(totalCompleted);
+        progressBar.setForeground(getColorForPercentage(overallProgress));
+        progressBar.setLeftLabel(String.valueOf(totalCompleted));
+        progressBar.setRightLabel(String.valueOf(thresholds.size()));
+        progressBar.setCenterLabel(new DecimalFormat("#.#%").format(overallProgress));
+        statsPanel.add(progressBar);
         
         // Add reset button
-        JButton resetButton = new JButton("Reset All Kill Counts");
+        JPanel buttonPanel = new JPanel(new BorderLayout(0, 5));
+        buttonPanel.setBackground(ColorScheme.DARK_GRAY_COLOR);
+        buttonPanel.setBorder(new EmptyBorder(10, 0, 0, 0));
+        
+        ColorJButton resetButton = new ColorJButton("Reset All Kill Counts", ColorScheme.DARK_GRAY_COLOR);
+        resetButton.setFocusPainted(false);
+        resetButton.setFont(FontManager.getRunescapeSmallFont());
         resetButton.addActionListener((ActionEvent e) -> {
             killTracker.resetKills();
-            JLabel confirmLabel = new JLabel("All kill counts have been reset!", SwingConstants.CENTER);
-            confirmLabel.setForeground(Color.RED);
-            panel.add(confirmLabel, BorderLayout.SOUTH);
-            panel.revalidate();
-            panel.repaint();
-            
-            // Refresh the UI to show the reset
-            SwingUtilities.invokeLater(() -> {
-                dispose();
-                open();
-            });
+            dispose();
+            open(); // Reopen with fresh data
         });
         
-        JPanel buttonPanel = new JPanel(new BorderLayout());
-        buttonPanel.setBorder(BorderFactory.createEmptyBorder(10, 0, 0, 0));
         buttonPanel.add(resetButton, BorderLayout.CENTER);
         
         JScrollPane scrollPane = new JScrollPane(statsPanel);
+        scrollPane.setBackground(ColorScheme.DARK_GRAY_COLOR);
         scrollPane.setBorder(BorderFactory.createEmptyBorder());
+        scrollPane.getVerticalScrollBar().setPreferredSize(new Dimension(16, 0));
         
         panel.add(scrollPane, BorderLayout.CENTER);
         panel.add(buttonPanel, BorderLayout.SOUTH);
@@ -413,27 +546,35 @@ public class ProgressDashboard extends JFrame
     
     private void addStatRow(JPanel panel, String label, String value)
     {
-        JPanel rowPanel = new JPanel(new BorderLayout(5, 0));
-        rowPanel.setBackground(ColorScheme.DARKER_GRAY_HOVER_COLOR);
-        rowPanel.setBorder(BorderFactory.createCompoundBorder(
-            BorderFactory.createMatteBorder(0, 0, 1, 0, ColorScheme.LIGHT_GRAY_COLOR),
+        JPanel row = new JPanel(new BorderLayout(5, 0));
+        row.setBackground(ColorScheme.DARKER_GRAY_COLOR);
+        row.setBorder(BorderFactory.createCompoundBorder(
+            BorderFactory.createMatteBorder(0, 0, 1, 0, ColorScheme.DARK_GRAY_COLOR),
             BorderFactory.createEmptyBorder(5, 5, 5, 5)
         ));
         
-        JLabel nameLabel = new JLabel(label);
-        nameLabel.setFont(FontManager.getRunescapeBoldFont());
+        JShadowedLabel nameLabel = new JShadowedLabel(label);
+        nameLabel.setFont(FontManager.getRunescapeSmallFont());
+        nameLabel.setForeground(Color.WHITE);
         
-        JLabel valueLabel = new JLabel(value, SwingConstants.RIGHT);
-        valueLabel.setFont(FontManager.getRunescapeFont());
+        JShadowedLabel valueLabel = new JShadowedLabel(value);
+        valueLabel.setFont(FontManager.getRunescapeSmallFont());
+        valueLabel.setForeground(Color.LIGHT_GRAY);
+        valueLabel.setHorizontalAlignment(SwingConstants.RIGHT);
         
-        rowPanel.add(nameLabel, BorderLayout.WEST);
-        rowPanel.add(valueLabel, BorderLayout.EAST);
+        row.add(nameLabel, BorderLayout.WEST);
+        row.add(valueLabel, BorderLayout.EAST);
         
-        panel.add(rowPanel);
+        panel.add(row);
+    }
+    
+    public boolean isOpen()
+    {
+        return isOpen;
     }
     
     // Helper class for sorting monsters by progress
-    private static class MobProgress implements Comparable<MobProgress>
+    private static class MobProgress
     {
         private final String name;
         private final int kills;
@@ -463,19 +604,7 @@ public class ProgressDashboard extends JFrame
         
         public float getProgress()
         {
-            return (float) kills / threshold;
+            return threshold > 0 ? (float) kills / threshold : 0;
         }
-        
-        @Override
-        public int compareTo(MobProgress other)
-        {
-            // Sort by progress (descending)
-            return Float.compare(other.getProgress(), this.getProgress());
-        }
-    }
-    
-    public boolean isOpen()
-    {
-        return isOpen;
     }
 }
