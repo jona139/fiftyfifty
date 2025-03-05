@@ -6,6 +6,7 @@ import java.awt.Dimension;
 import java.awt.GridLayout;
 import java.text.DecimalFormat;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -15,6 +16,7 @@ import javax.inject.Inject;
 import javax.swing.BorderFactory;
 import javax.swing.Box;
 import javax.swing.BoxLayout;
+import javax.swing.JButton;
 import javax.swing.JPanel;
 import javax.swing.SwingConstants;
 import javax.swing.border.EmptyBorder;
@@ -49,13 +51,22 @@ public class FiftyFiftyPanel extends PluginPanel {
             new ColorJButton("View Detailed Dashboard", ColorScheme.DARK_GRAY_COLOR);
     private final ColorJButton helpButton =
             new ColorJButton("Help", ColorScheme.DARKER_GRAY_COLOR);
-
+            
     // Custom monsters panel components
     private final JPanel customMonstersPanel;
     private final JShadowedLabel customMonstersTitleLabel = new JShadowedLabel("Custom Monsters:");
     private final JPanel customMonstersListPanel;
     private final ColorJButton addMonsterButton =
             new ColorJButton("Add New Monster", ColorScheme.DARKER_GRAY_COLOR);
+            
+    // Panel for pending new monsters
+    private final JPanel pendingMonstersPanel;
+    private final JShadowedLabel pendingMonstersTitleLabel = new JShadowedLabel("Pending New Monsters:");
+    private final JPanel pendingMonstersListPanel;
+    private final ColorJButton reviewMonstersButton =
+            new ColorJButton("Review Pending Monsters", ColorScheme.DARKER_GRAY_COLOR);
+    private final ColorJButton clearPendingButton =
+            new ColorJButton("Clear All Pending", ColorScheme.DARK_GRAY_COLOR);
 
     @Inject
     public FiftyFiftyPanel(final EnemyTrackerPlugin plugin, final EnemyKillTracker killTracker,
@@ -132,6 +143,38 @@ public class FiftyFiftyPanel extends PluginPanel {
         addMonsterButton.setFocusPainted(false);
         addMonsterButton.addActionListener(e -> plugin.openAddMonsterDialog());
         customMonstersPanel.add(addMonsterButton, BorderLayout.SOUTH);
+        
+        // Pending monsters panel
+        pendingMonstersPanel = new JPanel(new BorderLayout(0, 5));
+        pendingMonstersPanel.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createMatteBorder(1, 1, 1, 1, ColorScheme.DARK_GRAY_COLOR),
+                BorderFactory.createEmptyBorder(5, 5, 5, 5)
+        ));
+        pendingMonstersPanel.setOpaque(false);
+
+        pendingMonstersTitleLabel.setFont(FontManager.getRunescapeFont());
+        pendingMonstersTitleLabel.setForeground(Color.WHITE);
+        pendingMonstersPanel.add(pendingMonstersTitleLabel, BorderLayout.NORTH);
+
+        pendingMonstersListPanel = new JPanel(new GridLayout(0, 1, 0, 5));
+        pendingMonstersListPanel.setOpaque(false);
+        pendingMonstersPanel.add(pendingMonstersListPanel, BorderLayout.CENTER);
+
+        // Panel for buttons
+        JPanel pendingButtonsPanel = new JPanel(new GridLayout(1, 2, 5, 0));
+        pendingButtonsPanel.setOpaque(false);
+
+        reviewMonstersButton.setFont(FontManager.getRunescapeSmallFont());
+        reviewMonstersButton.setFocusPainted(false);
+        reviewMonstersButton.addActionListener(e -> reviewPendingMonsters());
+
+        clearPendingButton.setFont(FontManager.getRunescapeSmallFont());
+        clearPendingButton.setFocusPainted(false);
+        clearPendingButton.addActionListener(e -> clearPendingMonsters());
+
+        pendingButtonsPanel.add(reviewMonstersButton);
+        pendingButtonsPanel.add(clearPendingButton);
+        pendingMonstersPanel.add(pendingButtonsPanel, BorderLayout.SOUTH);
 
         // Button panel
         final JPanel buttonPanel = new JPanel(new GridLayout(3, 1, 0, 5));
@@ -170,6 +213,12 @@ public class FiftyFiftyPanel extends PluginPanel {
         contentPanel.add(Box.createRigidArea(new Dimension(0, 10)));
         contentPanel.add(statsPanel);
 
+        // Only add pending monsters panel if there are any pending monsters
+        if (!plugin.getPendingNewMonsters().isEmpty()) {
+            contentPanel.add(Box.createRigidArea(new Dimension(0, 10)));
+            contentPanel.add(pendingMonstersPanel);
+        }
+
         // Only add custom monsters panel if configured
         if (config.showCustomMonstersSection()) {
             contentPanel.add(Box.createRigidArea(new Dimension(0, 10)));
@@ -187,6 +236,7 @@ public class FiftyFiftyPanel extends PluginPanel {
         if (allKills.isEmpty()) {
             remove(progressPanel);
             remove(statsPanel);
+            remove(pendingMonstersPanel);
             remove(customMonstersPanel);
             add(errorPanel, BorderLayout.CENTER);
             revalidate();
@@ -202,33 +252,34 @@ public class FiftyFiftyPanel extends PluginPanel {
 
         // Update stats panel
         updateStatsPanel(allKills, thresholds);
-
+        
+        // Update pending monsters panel
+        updatePendingMonstersPanel();
+        
         // Update custom monsters panel
         updateCustomMonstersPanel();
-
-        // Show/hide custom monsters panel based on configuration
+        
+        // Get the content panel
+        JPanel contentPanel = (JPanel)getComponent(1);
+        
+        // Clear the content panel
+        contentPanel.removeAll();
+        
+        // Add panels to content panel
+        contentPanel.add(progressPanel);
+        contentPanel.add(Box.createRigidArea(new Dimension(0, 10)));
+        contentPanel.add(statsPanel);
+        
+        // Only add pending monsters panel if there are any pending monsters
+        if (!plugin.getPendingNewMonsters().isEmpty()) {
+            contentPanel.add(Box.createRigidArea(new Dimension(0, 10)));
+            contentPanel.add(pendingMonstersPanel);
+        }
+        
+        // Only add custom monsters panel if configured
         if (config.showCustomMonstersSection()) {
-            // Check if it's already showing
-            boolean alreadyAdded = false;
-            for (java.awt.Component component : ((JPanel)getComponent(1)).getComponents()) {
-                if (component == customMonstersPanel) {
-                    alreadyAdded = true;
-                    break;
-                }
-            }
-
-            if (!alreadyAdded) {
-                ((JPanel)getComponent(1)).add(Box.createRigidArea(new Dimension(0, 10)));
-                ((JPanel)getComponent(1)).add(customMonstersPanel);
-            }
-        } else {
-            // Remove it if it exists
-            for (java.awt.Component component : ((JPanel)getComponent(1)).getComponents()) {
-                if (component == customMonstersPanel) {
-                    ((JPanel)getComponent(1)).remove(component);
-                    break;
-                }
-            }
+            contentPanel.add(Box.createRigidArea(new Dimension(0, 10)));
+            contentPanel.add(customMonstersPanel);
         }
 
         revalidate();
@@ -389,15 +440,69 @@ public class FiftyFiftyPanel extends PluginPanel {
 
         statRowsPanel.add(totalProgressBar);
     }
-
-    // Update the custom monsters panel
+    
+    /**
+     * Updates the pending monsters panel with current pending monsters
+     */
+    private void updatePendingMonstersPanel() {
+        // Clear existing list
+        pendingMonstersListPanel.removeAll();
+        
+        // Get pending monsters
+        Map<String, Long> pendingMonsters = plugin.getPendingNewMonsters();
+        
+        // If no pending monsters
+        if (pendingMonsters.isEmpty()) {
+            // Return if there are no pending monsters - the panel won't be shown
+            return;
+        }
+        
+        // Sort monsters alphabetically
+        List<String> sortedMonsters = new ArrayList<>(pendingMonsters.keySet());
+        Collections.sort(sortedMonsters);
+        
+        // Add each pending monster to the panel
+        for (String monsterName : sortedMonsters) {
+            JPanel monsterPanel = new JPanel(new BorderLayout());
+            monsterPanel.setOpaque(false);
+            monsterPanel.setBorder(BorderFactory.createMatteBorder(0, 0, 1, 0, ColorScheme.DARK_GRAY_COLOR));
+            
+            JShadowedLabel nameLabel = new JShadowedLabel(monsterName);
+            nameLabel.setFont(FontManager.getRunescapeSmallFont());
+            nameLabel.setForeground(Color.WHITE);
+            
+            JButton addButton = new JButton("Add");
+            addButton.setFont(FontManager.getRunescapeSmallFont());
+            addButton.setFocusPainted(false);
+            addButton.addActionListener(e -> addPendingMonster(monsterName));
+            
+            JButton skipButton = new JButton("Skip");
+            skipButton.setFont(FontManager.getRunescapeSmallFont());
+            skipButton.setFocusPainted(false);
+            skipButton.addActionListener(e -> skipPendingMonster(monsterName));
+            
+            JPanel buttonPanel = new JPanel(new GridLayout(1, 2, 5, 0));
+            buttonPanel.setOpaque(false);
+            buttonPanel.add(addButton);
+            buttonPanel.add(skipButton);
+            
+            monsterPanel.add(nameLabel, BorderLayout.CENTER);
+            monsterPanel.add(buttonPanel, BorderLayout.EAST);
+            
+            pendingMonstersListPanel.add(monsterPanel);
+        }
+    }
+    
+    /**
+     * Updates the custom monsters panel
+     */
     private void updateCustomMonstersPanel() {
         // Clear existing list
         customMonstersListPanel.removeAll();
-
+        
         // Get custom monsters
         Map<String, String> customMonsters = NpcKillThreshold.getCustomMonsters();
-
+        
         // If no custom monsters
         if (customMonsters.isEmpty()) {
             JShadowedLabel noCustomLabel = new JShadowedLabel("No custom monsters defined");
@@ -407,11 +512,11 @@ public class FiftyFiftyPanel extends PluginPanel {
             customMonstersListPanel.add(noCustomLabel);
             return;
         }
-
+        
         // Sort monsters alphabetically
         List<Map.Entry<String, String>> sortedMonsters = new ArrayList<>(customMonsters.entrySet());
         sortedMonsters.sort(Map.Entry.comparingByKey());
-
+        
         // Add each custom monster to the panel
         for (Map.Entry<String, String> entry : sortedMonsters) {
             String monsterName = entry.getKey();
@@ -419,27 +524,27 @@ public class FiftyFiftyPanel extends PluginPanel {
             int kills = killTracker.getKills(monsterName);
             int threshold = NpcKillThreshold.getThreshold(monsterName);
             boolean isExempt = NpcKillThreshold.isExempt(monsterName);
-
+            
             JPanel monsterPanel = new JPanel(new BorderLayout());
             monsterPanel.setOpaque(false);
             monsterPanel.setBorder(BorderFactory.createMatteBorder(0, 0, 1, 0, ColorScheme.DARK_GRAY_COLOR));
-
+            
             JPanel infoPanel = new JPanel(new GridLayout(0, 1));
             infoPanel.setOpaque(false);
-
+            
             // Monster name
             JShadowedLabel nameLabel = new JShadowedLabel(monsterName);
             nameLabel.setFont(FontManager.getRunescapeSmallFont());
             nameLabel.setForeground(Color.WHITE);
             infoPanel.add(nameLabel);
-
+            
             // Drop info
             String dropInfo = isExempt ? "Exempt" : "Drop: " + dropName;
             JShadowedLabel dropLabel = new JShadowedLabel(dropInfo);
             dropLabel.setFont(FontManager.getRunescapeSmallFont());
             dropLabel.setForeground(isExempt ? Color.CYAN : ColorScheme.LIGHT_GRAY_COLOR);
             infoPanel.add(dropLabel);
-
+            
             // Kill info if not exempt
             if (!isExempt) {
                 String killInfo = kills + "/" + threshold + " kills";
@@ -448,9 +553,56 @@ public class FiftyFiftyPanel extends PluginPanel {
                 killsLabel.setForeground(kills >= threshold ? Color.RED : ColorScheme.LIGHT_GRAY_COLOR);
                 infoPanel.add(killsLabel);
             }
-
+            
             monsterPanel.add(infoPanel, BorderLayout.CENTER);
             customMonstersListPanel.add(monsterPanel);
+        }
+    }
+    
+    /**
+     * Add a pending monster to the database
+     */
+    private void addPendingMonster(String monsterName) {
+        plugin.handleNewMonster(monsterName);
+        plugin.removePendingMonster(monsterName);
+    }
+
+    /**
+     * Skip a pending monster (remove it from the list without adding)
+     */
+    private void skipPendingMonster(String monsterName) {
+        plugin.removePendingMonster(monsterName);
+    }
+
+    /**
+     * Review all pending monsters in sequence
+     */
+    private void reviewPendingMonsters() {
+        // Get a copy of the monster names to avoid concurrent modification
+        List<String> monsters = new ArrayList<>(plugin.getPendingNewMonsters().keySet());
+        if (monsters.isEmpty()) {
+            return;
+        }
+        
+        // Process the first monster
+        addPendingMonster(monsters.get(0));
+    }
+
+    /**
+     * Clear all pending monsters
+     */
+    private void clearPendingMonsters() {
+        // Confirm with the user first
+        int confirm = javax.swing.JOptionPane.showConfirmDialog(
+            this,
+            "Are you sure you want to clear all pending monsters?",
+            "Confirm Clear",
+            javax.swing.JOptionPane.YES_NO_OPTION,
+            javax.swing.JOptionPane.WARNING_MESSAGE
+        );
+        
+        if (confirm == javax.swing.JOptionPane.YES_OPTION) {
+            plugin.clearPendingMonsters();
         }
     }
 
@@ -476,13 +628,13 @@ public class FiftyFiftyPanel extends PluginPanel {
     private void resetAllKills() {
         // Create a confirmation dialog
         int confirm = javax.swing.JOptionPane.showConfirmDialog(
-                this,
-                "Are you sure you want to reset all kill counts?",
-                "Confirm Reset",
-                javax.swing.JOptionPane.YES_NO_OPTION,
-                javax.swing.JOptionPane.WARNING_MESSAGE
+            this,
+            "Are you sure you want to reset all kill counts?",
+            "Confirm Reset",
+            javax.swing.JOptionPane.YES_NO_OPTION,
+            javax.swing.JOptionPane.WARNING_MESSAGE
         );
-
+        
         // Only reset if user confirmed
         if (confirm == javax.swing.JOptionPane.YES_OPTION) {
             killTracker.resetKills();

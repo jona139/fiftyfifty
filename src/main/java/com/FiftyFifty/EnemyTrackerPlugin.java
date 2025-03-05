@@ -1,5 +1,7 @@
 package com.FiftyFifty;
 
+import com.google.gson.Gson;
+import com.google.gson.reflect.TypeToken;
 import com.google.inject.Provides;
 import javax.inject.Inject;
 import javax.swing.SwingUtilities;
@@ -32,8 +34,11 @@ import java.awt.Color;
 import java.awt.Frame;
 import java.awt.Graphics2D;
 import java.awt.image.BufferedImage;
+import java.lang.reflect.Type;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -47,6 +52,8 @@ public class EnemyTrackerPlugin extends Plugin
 {
     // GitHub repository URL
     private static final String GITHUB_URL = "https://github.com/GamecubeJona/fifty-fifty";
+    private static final String CONFIG_GROUP = "enemytracker";
+    private static final String PENDING_MONSTERS_KEY = "pendingMonsters";
     
     @Inject
     private Client client;
@@ -84,6 +91,9 @@ public class EnemyTrackerPlugin extends Plugin
     private final Map<String, Long> recentNewMonsters = new ConcurrentHashMap<>();
     private static final long NEW_MONSTER_COOLDOWN = 60000; // 60 seconds in milliseconds
     
+    // Map to store pending new monsters for batch processing
+    private final Map<String, Long> pendingNewMonsters = new ConcurrentHashMap<>();
+    
     @Override
     protected void startUp() throws Exception
     {
@@ -91,6 +101,9 @@ public class EnemyTrackerPlugin extends Plugin
 
         // Initialize custom NPC thresholds
         NpcKillThreshold.loadCustomMonsters(configManager);
+        
+        // Load pending monsters
+        loadPendingMonsters();
         
         killTracker = new EnemyKillTracker(configManager);
         highlighter = new EnemyHighlighter(client, killTracker, config);
@@ -171,12 +184,50 @@ public class EnemyTrackerPlugin extends Plugin
         
         interactingMap.clear();
         recentNewMonsters.clear();
+        
+        // If there are pending monsters, save them to the config
+        if (!pendingNewMonsters.isEmpty()) {
+            savePendingMonsters();
+        }
+    }
+    
+    /**
+     * Save pending monsters to config
+     */
+    private void savePendingMonsters() {
+        // Convert to a serializable format (just the monster names)
+        List<String> monsterNames = new ArrayList<>(pendingNewMonsters.keySet());
+        String json = new Gson().toJson(monsterNames);
+        configManager.setConfiguration(CONFIG_GROUP, PENDING_MONSTERS_KEY, json);
+    }
+
+    /**
+     * Load pending monsters from config
+     */
+    private void loadPendingMonsters() {
+        String json = configManager.getConfiguration(CONFIG_GROUP, PENDING_MONSTERS_KEY);
+        if (json == null || json.isEmpty()) {
+            return;
+        }
+        
+        try {
+            Type type = new TypeToken<ArrayList<String>>(){}.getType();
+            List<String> monsterNames = new Gson().fromJson(json, type);
+            
+            // Add to the pending monsters map with current timestamp
+            long now = System.currentTimeMillis();
+            for (String name : monsterNames) {
+                pendingNewMonsters.put(name, now);
+            }
+        } catch (Exception e) {
+            log.error("Error loading pending monsters", e);
+        }
     }
     
     /**
      * Handle a new monster that's not in the database
      */
-    private void handleNewMonster(String npcName) {
+    public void handleNewMonster(String npcName) {
         // Check if we've recently seen this monster to avoid repeated dialogs
         if (recentNewMonsters.containsKey(npcName)) {
             long lastSeen = recentNewMonsters.get(npcName);
@@ -216,6 +267,31 @@ public class EnemyTrackerPlugin extends Plugin
             );
             dialog.setVisible(true);
         });
+    }
+    
+    /**
+     * Get the pending new monsters
+     */
+    public Map<String, Long> getPendingNewMonsters() {
+        return pendingNewMonsters;
+    }
+    
+    /**
+     * Remove a monster from the pending list
+     */
+    public void removePendingMonster(String monsterName) {
+        pendingNewMonsters.remove(monsterName);
+        // Update the panel
+        SwingUtilities.invokeLater(() -> pluginPanel.update());
+    }
+    
+    /**
+     * Clear all pending monsters
+     */
+    public void clearPendingMonsters() {
+        pendingNewMonsters.clear();
+        // Update the panel
+        SwingUtilities.invokeLater(() -> pluginPanel.update());
     }
     
     /**
@@ -542,7 +618,28 @@ public class EnemyTrackerPlugin extends Plugin
                 // Check if this is a new monster not in our database
                 if (!NpcKillThreshold.isMonsterDefined(npcName)) {
                     log.info("Detected new monster: {}", npcName);
-                    handleNewMonster(npcName);
+                    
+                    // If batch mode is enabled, add to pending monsters
+                    if (config.batchModeEnabled()) {
+                        // Only add if not already in the pending list
+                        if (!pendingNewMonsters.containsKey(npcName)) {
+                            pendingNewMonsters.put(npcName, System.currentTimeMillis());
+                            // Notify the player that a new monster was added to the pending list
+                            clientThread.invoke(() -> {
+                                client.addChatMessage(
+                                    net.runelite.api.ChatMessageType.GAMEMESSAGE,
+                                    "",
+                                    "New monster detected: " + npcName + " (Added to pending list)",
+                                    null
+                                );
+                            });
+                            // Update the panel to show the new pending monster
+                            SwingUtilities.invokeLater(() -> pluginPanel.update());
+                        }
+                    } else {
+                        // If batch mode is disabled, show dialog immediately
+                        handleNewMonster(npcName);
+                    }
                 }
             }
             

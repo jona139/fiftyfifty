@@ -10,120 +10,131 @@ import net.runelite.client.config.Range;
 public interface EnemyTrackerConfig extends Config
 {
     @ConfigSection(
-            name = "Display Options",
-            description = "Configure how the plugin displays information",
-            position = 0
+        name = "Display Options",
+        description = "Configure how the plugin displays information",
+        position = 0
     )
     String displayOptions = "displayOptions";
-
+    
     @ConfigSection(
-            name = "NPC Options",
-            description = "Configure specific NPC behavior",
-            position = 1
+        name = "NPC Options",
+        description = "Configure specific NPC behavior",
+        position = 1
     )
     String npcOptions = "npcOptions";
-
+    
     @ConfigSection(
-            name = "Dashboard",
-            description = "View your overall progress",
-            position = 2
+        name = "Dashboard",
+        description = "View your overall progress",
+        position = 2
     )
     String dashboardOptions = "dashboardOptions";
-
+    
     @ConfigSection(
-            name = "Custom Monsters",
-            description = "Manage custom monster data",
-            position = 3
+        name = "Custom Monsters",
+        description = "Manage custom monster data",
+        position = 3
     )
     String customMonsterOptions = "customMonsterOptions";
-
+    
     // Progress indicator removed as it's no longer needed
-
+    
     @ConfigItem(
-            keyName = "showRecentKillOverlay",
-            name = "Show Recent Kill Overlay",
-            description = "Display information about your most recent kill",
-            section = displayOptions
+        keyName = "showRecentKillOverlay",
+        name = "Show Recent Kill Overlay",
+        description = "Display information about your most recent kill",
+        section = displayOptions
     )
     default boolean showRecentKillOverlay()
     {
         return true;
     }
-
+    
     @ConfigItem(
-            keyName = "hideAttackOption",
-            name = "Hide Attack Option on Maxed NPCs",
-            description = "Remove the attack option for NPCs that have reached max kill count",
-            section = npcOptions
+        keyName = "hideAttackOption",
+        name = "Hide Attack Option on Maxed NPCs",
+        description = "Remove the attack option for NPCs that have reached max kill count",
+        section = npcOptions
     )
     default boolean hideAttackOption()
     {
         return true;
     }
-
+    
     @ConfigItem(
-            keyName = "useGlobalThresholds",
-            name = "Use Preset NPC Thresholds",
-            description = "Use the preset kill thresholds for specific NPCs",
-            section = npcOptions
+        keyName = "useGlobalThresholds",
+        name = "Use Preset NPC Thresholds",
+        description = "Use the preset kill thresholds for specific NPCs",
+        section = npcOptions
     )
     default boolean useGlobalThresholds()
     {
         return true;
     }
-
+    
     @ConfigItem(
-            keyName = "defaultKillThreshold",
-            name = "Default Kill Threshold",
-            description = "The default number of kills required to gray out an NPC (if not specifically defined)",
-            section = npcOptions
+        keyName = "defaultKillThreshold",
+        name = "Default Kill Threshold",
+        description = "The default number of kills required to gray out an NPC (if not specifically defined)",
+        section = npcOptions
     )
     @Range(min = 1, max = 1000)
     default int defaultKillThreshold()
     {
         return 10;
     }
-
+    
     @ConfigItem(
-            keyName = "resetKills",
-            name = "Reset All Kills",
-            description = "Reset the kill count for all NPCs",
-            section = npcOptions
+        keyName = "resetKills",
+        name = "Reset All Kills",
+        description = "Reset the kill count for all NPCs",
+        section = npcOptions
     )
     default boolean resetKills()
     {
         return false;
     }
-
+    
     @ConfigItem(
-            keyName = "openDashboard",
-            name = "Open Progress Dashboard",
-            description = "Show the progress dashboard with all monsters and your current kill counts",
-            section = dashboardOptions
+        keyName = "openDashboard",
+        name = "Open Progress Dashboard",
+        description = "Show the progress dashboard with all monsters and your current kill counts",
+        section = dashboardOptions
     )
     default boolean openDashboard()
     {
         return false;
     }
-
+    
     @ConfigItem(
-            keyName = "resetCustomMonsters",
-            name = "Reset Custom Monsters",
-            description = "Reset all custom monster definitions",
-            section = customMonsterOptions
+        keyName = "resetCustomMonsters",
+        name = "Reset Custom Monsters",
+        description = "Reset all custom monster definitions",
+        section = customMonsterOptions
     )
     default boolean resetCustomMonsters()
     {
         return false;
     }
-
+    
     @ConfigItem(
-            keyName = "showCustomMonstersSection",
-            name = "Show Custom Monsters in Panel",
-            description = "Show a dedicated section for custom monsters in the plugin panel",
-            section = customMonsterOptions
+        keyName = "showCustomMonstersSection",
+        name = "Show Custom Monsters in Panel",
+        description = "Show a dedicated section for custom monsters in the plugin panel",
+        section = customMonsterOptions
     )
     default boolean showCustomMonstersSection()
+    {
+        return true;
+    }
+    
+    @ConfigItem(
+        keyName = "batchModeEnabled",
+        name = "Batch Add New Monsters",
+        description = "Collect new monsters for later review instead of showing a popup immediately",
+        section = customMonsterOptions
+    )
+    default boolean batchModeEnabled()
     {
         return true;
     }
