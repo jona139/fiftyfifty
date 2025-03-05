@@ -71,6 +71,13 @@ public class MenuEntrySwapper
         }
         
         String npcName = npc.getName();
+        
+        // Check if this monster is exempt from kill limits
+        if (NpcKillThreshold.isExempt(npcName)) {
+            log.info("Monster is exempt from kill limits: {}", npcName); // DEBUG
+            return; // Allow the attack option
+        }
+        
         int threshold = NpcKillThreshold.getThreshold(npcName);
         int currentKills = killTracker.getKills(npcName);
         
@@ -169,6 +176,13 @@ public class MenuEntrySwapper
             }
             
             String npcName = npc.getName();
+            
+            // Check if this monster is exempt from kill limits
+            if (NpcKillThreshold.isExempt(npcName)) {
+                log.info("Monster is exempt from kill limits: {}", npcName); // DEBUG
+                return; // Allow the attack to proceed
+            }
+            
             int threshold = NpcKillThreshold.getThreshold(npcName);
             int currentKills = killTracker.getKills(npcName);
             

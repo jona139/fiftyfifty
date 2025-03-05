@@ -65,51 +65,71 @@ public class RecentKillOverlay extends OverlayPanel {
             .rightColor(Color.WHITE)
             .build());
         
-        // Kill count
-        int currentKills = killTracker.getKills(recentNpcName);
-        int maxKills = NpcKillThreshold.getThreshold(recentNpcName);
+        // Check if this is an exempt monster
+        boolean isExempt = NpcKillThreshold.isExempt(recentNpcName);
         
-        Color countColor = currentKills >= maxKills ? Color.RED : Color.WHITE;
-        
-        panelComponent.getChildren().add(LineComponent.builder()
-            .left("Kills:")
-            .right(currentKills + "/" + maxKills)
-            .leftColor(Color.WHITE)
-            .rightColor(countColor)
-            .build());
-        
-        // Progress bar instead of text progress
-        final ProgressBarComponent progressBar = new ProgressBarComponent();
-        progressBar.setBackgroundColor(new Color(61, 56, 49));
-        progressBar.setMinimum(0);
-        progressBar.setMaximum(maxKills);
-        progressBar.setValue(currentKills);
-        
-        // Set color based on progress
-        float progressPercent = (float) currentKills / maxKills;
-        
-        if (progressPercent >= 1.0f) {
-            progressBar.setForegroundColor(Color.RED);  // Maxed out - red
-        } else if (progressPercent >= 0.75f) {
-            progressBar.setForegroundColor(Color.decode("#aeff00"));  // Light green
-        } else if (progressPercent >= 0.5f) {
-            progressBar.setForegroundColor(Color.decode("#ffe500"));  // Yellow
-        } else if (progressPercent >= 0.25f) {
-            progressBar.setForegroundColor(Color.decode("#ffb600"));  // Orange
-        } else {
-            progressBar.setForegroundColor(Color.decode("#ea6600"));  // Dark orange
-        }
-        
-        panelComponent.getChildren().add(progressBar);
-        
-        // Status message
-        if (currentKills >= maxKills) {
+        // For exempt monsters, show a different message
+        if (isExempt) {
             panelComponent.getChildren().add(LineComponent.builder()
                 .left("Status:")
-                .right("MAXED OUT")
+                .right("EXEMPT")
                 .leftColor(Color.WHITE)
-                .rightColor(Color.RED)
+                .rightColor(Color.CYAN)
                 .build());
+                
+            panelComponent.getChildren().add(LineComponent.builder()
+                .left("Note:")
+                .right("Common drops only")
+                .leftColor(Color.WHITE)
+                .rightColor(Color.LIGHT_GRAY)
+                .build());
+        } else {
+            // Kill count
+            int currentKills = killTracker.getKills(recentNpcName);
+            int maxKills = NpcKillThreshold.getThreshold(recentNpcName);
+            
+            Color countColor = currentKills >= maxKills ? Color.RED : Color.WHITE;
+            
+            panelComponent.getChildren().add(LineComponent.builder()
+                .left("Kills:")
+                .right(currentKills + "/" + maxKills)
+                .leftColor(Color.WHITE)
+                .rightColor(countColor)
+                .build());
+            
+            // Progress bar instead of text progress
+            final ProgressBarComponent progressBar = new ProgressBarComponent();
+            progressBar.setBackgroundColor(new Color(61, 56, 49));
+            progressBar.setMinimum(0);
+            progressBar.setMaximum(maxKills);
+            progressBar.setValue(currentKills);
+            
+            // Set color based on progress
+            float progressPercent = (float) currentKills / maxKills;
+            
+            if (progressPercent >= 1.0f) {
+                progressBar.setForegroundColor(Color.RED);  // Maxed out - red
+            } else if (progressPercent >= 0.75f) {
+                progressBar.setForegroundColor(Color.decode("#aeff00"));  // Light green
+            } else if (progressPercent >= 0.5f) {
+                progressBar.setForegroundColor(Color.decode("#ffe500"));  // Yellow
+            } else if (progressPercent >= 0.25f) {
+                progressBar.setForegroundColor(Color.decode("#ffb600"));  // Orange
+            } else {
+                progressBar.setForegroundColor(Color.decode("#ea6600"));  // Dark orange
+            }
+            
+            panelComponent.getChildren().add(progressBar);
+            
+            // Status message
+            if (currentKills >= maxKills) {
+                panelComponent.getChildren().add(LineComponent.builder()
+                    .left("Status:")
+                    .right("MAXED OUT")
+                    .leftColor(Color.WHITE)
+                    .rightColor(Color.RED)
+                    .build());
+            }
         }
         
         panelComponent.setPreferredSize(new Dimension(200, 100));

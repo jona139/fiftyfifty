@@ -211,6 +211,14 @@ public class EnemyTrackerPlugin extends Plugin
             }
             
             String npcName = npc.getName();
+            
+            // Check if this monster is exempt from kill limits (like cows)
+            if (NpcKillThreshold.isExempt(npcName)) {
+                // Exempt monsters can always be attacked
+                newEntries[index++] = entry;
+                continue;
+            }
+            
             int threshold = NpcKillThreshold.getThreshold(npcName);
             int currentKills = killTracker.getKills(npcName);
             
@@ -305,6 +313,14 @@ public class EnemyTrackerPlugin extends Plugin
             }
             
             String npcName = npc.getName();
+            
+            // Check if this monster is exempt from kill limits
+            if (NpcKillThreshold.isExempt(npcName)) {
+                // Allow attacking exempt monsters without restrictions
+                newEntries[index++] = entry;
+                continue;
+            }
+            
             int threshold = NpcKillThreshold.getThreshold(npcName);
             int currentKills = killTracker.getKills(npcName);
             
@@ -411,6 +427,13 @@ public class EnemyTrackerPlugin extends Plugin
                 if (npc.getName() != null)
                 {
                     String npcName = npc.getName();
+                    
+                    // Skip exempt monsters (like cows that always drop the same items)
+                    if (NpcKillThreshold.isExempt(npcName)) {
+                        log.debug("Interacting with exempt monster: {}", npcName);
+                        return;
+                    }
+                    
                     int threshold = NpcKillThreshold.getThreshold(npcName);
                     int currentKills = killTracker.getKills(npcName);
                     
