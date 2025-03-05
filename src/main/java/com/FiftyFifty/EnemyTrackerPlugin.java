@@ -2,6 +2,7 @@ package com.FiftyFifty;
 
 import com.google.inject.Provides;
 import javax.inject.Inject;
+import javax.swing.SwingUtilities;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
 import net.runelite.api.GameState;
@@ -20,7 +21,6 @@ import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.EventBus;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.events.ConfigChanged;
-import net.runelite.client.menus.MenuManager;
 import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
 import net.runelite.client.ui.ClientToolbar;
@@ -29,11 +29,13 @@ import net.runelite.client.ui.overlay.OverlayManager;
 import net.runelite.client.util.LinkBrowser;
 
 import java.awt.Color;
+import java.awt.Frame;
 import java.awt.Graphics2D;
 import java.awt.image.BufferedImage;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Slf4j
 @PluginDescriptor(
@@ -78,11 +80,18 @@ public class EnemyTrackerPlugin extends Plugin
     // Keep track of player interactions
     private final Map<NPC, Player> interactingMap = new HashMap<>();
     
+    // Keep track of recently seen new monsters to avoid showing multiple dialogs
+    private final Map<String, Long> recentNewMonsters = new ConcurrentHashMap<>();
+    private static final long NEW_MONSTER_COOLDOWN = 60000; // 60 seconds in milliseconds
+    
     @Override
     protected void startUp() throws Exception
     {
         log.info("Fifty-Fifty plugin started!");
 
+        // Initialize custom NPC thresholds
+        NpcKillThreshold.loadCustomMonsters(configManager);
+        
         killTracker = new EnemyKillTracker(configManager);
         highlighter = new EnemyHighlighter(client, killTracker, config);
         recentKillOverlay = new RecentKillOverlay(config, killTracker);
@@ -161,6 +170,52 @@ public class EnemyTrackerPlugin extends Plugin
         eventBus.unregister(menuEntrySwapper);
         
         interactingMap.clear();
+        recentNewMonsters.clear();
+    }
+    
+    /**
+     * Handle a new monster that's not in the database
+     */
+    private void handleNewMonster(String npcName) {
+        // Check if we've recently seen this monster to avoid repeated dialogs
+        if (recentNewMonsters.containsKey(npcName)) {
+            long lastSeen = recentNewMonsters.get(npcName);
+            if (System.currentTimeMillis() - lastSeen < NEW_MONSTER_COOLDOWN) {
+                // Skip if we've seen this monster recently
+                return;
+            }
+        }
+        
+        // Mark this monster as recently seen
+        recentNewMonsters.put(npcName, System.currentTimeMillis());
+        
+        // Create and show the dialog on the EDT
+        SwingUtilities.invokeLater(() -> {
+            // Use null for parent frame which will center it on screen
+            Frame parentFrame = null;
+            
+            // Create the dialog
+            NewMonsterDialog dialog = new NewMonsterDialog(parentFrame, npcName, 
+                (monsterName, dropName, dropRate, isExempt) -> {
+                    // Add the monster to the database
+                    NpcKillThreshold.addCustomMonster(configManager, monsterName, dropName, dropRate, isExempt);
+                    
+                    // Update the panel
+                    SwingUtilities.invokeLater(() -> pluginPanel.update());
+                    
+                    // Inform the player
+                    clientThread.invoke(() -> {
+                        client.addChatMessage(
+                            net.runelite.api.ChatMessageType.GAMEMESSAGE,
+                            "",
+                            "Added " + monsterName + " to the Fifty-Fifty database.",
+                            null
+                        );
+                    });
+                }
+            );
+            dialog.setVisible(true);
+        });
     }
     
     /**
@@ -483,6 +538,12 @@ public class EnemyTrackerPlugin extends Plugin
                     npcName, 
                     killTracker.getKills(npcName),
                     NpcKillThreshold.getThreshold(npcName));
+                
+                // Check if this is a new monster not in our database
+                if (!NpcKillThreshold.isMonsterDefined(npcName)) {
+                    log.info("Detected new monster: {}", npcName);
+                    handleNewMonster(npcName);
+                }
             }
             
             // Remove the NPC from the tracking map
@@ -505,6 +566,24 @@ public class EnemyTrackerPlugin extends Plugin
             configManager.setConfiguration(EnemyTrackerConfig.class.getAnnotation(ConfigGroup.class).value(), "resetKills", false);
             // Update the panel
             pluginPanel.update();
+        }
+        
+        if (config.resetCustomMonsters())
+        {
+            NpcKillThreshold.resetCustomMonsters(configManager);
+            // Reset the config option
+            configManager.setConfiguration(EnemyTrackerConfig.class.getAnnotation(ConfigGroup.class).value(), "resetCustomMonsters", false);
+            // Update the panel
+            pluginPanel.update();
+            // Inform the user
+            clientThread.invoke(() -> {
+                client.addChatMessage(
+                    net.runelite.api.ChatMessageType.GAMEMESSAGE,
+                    "",
+                    "Reset all custom monster data.",
+                    null
+                );
+            });
         }
         
         // Check if dashboard should be opened
@@ -553,6 +632,44 @@ public class EnemyTrackerPlugin extends Plugin
         {
             progressDashboard.requestFocus();
         }
+    }
+    
+    /**
+     * Opens a dialog to manually add a new monster
+     */
+    public void openAddMonsterDialog()
+    {
+        SwingUtilities.invokeLater(() -> {
+            // Use null for parent frame which will center it on screen
+            Frame parentFrame = null;
+            
+            // Show an input dialog to get the monster name
+            String monsterName = javax.swing.JOptionPane.showInputDialog(
+                parentFrame,
+                "Enter the monster name:",
+                "Add New Monster",
+                javax.swing.JOptionPane.QUESTION_MESSAGE
+            );
+            
+            if (monsterName != null && !monsterName.trim().isEmpty()) {
+                monsterName = monsterName.trim();
+                
+                // Check if the monster already exists
+                if (NpcKillThreshold.isMonsterDefined(monsterName)) {
+                    javax.swing.JOptionPane.showMessageDialog(
+                        parentFrame,
+                        "This monster is already defined in the database.",
+                        "Monster Already Exists",
+                        javax.swing.JOptionPane.INFORMATION_MESSAGE
+                    );
+                    return;
+                }
+                
+                // Show the dialog to add the monster
+                final String finalName = monsterName;
+                handleNewMonster(finalName);
+            }
+        });
     }
     
     @Provides

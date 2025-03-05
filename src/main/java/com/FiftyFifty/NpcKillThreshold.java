@@ -1,6 +1,11 @@
 package com.FiftyFifty;
 
+import com.google.gson.Gson;
+import com.google.gson.reflect.TypeToken;
 import lombok.Getter;
+import net.runelite.client.config.ConfigManager;
+
+import java.lang.reflect.Type;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -10,6 +15,12 @@ import java.util.Map;
  * where the threshold is the number of kills needed for a 50% chance to get the rarest drop
  */
 public class NpcKillThreshold {
+    
+    // Config keys for storing custom thresholds
+    private static final String CONFIG_GROUP = "enemytracker";
+    private static final String CUSTOM_THRESHOLDS_KEY = "customThresholds";
+    private static final String CUSTOM_DROPS_KEY = "customDrops";
+    private static final String EXEMPT_MONSTERS_KEY = "exemptMonsters";
     
     /**
      * Inner class to store monster drop information
@@ -62,6 +73,14 @@ public class NpcKillThreshold {
     @Getter
     private static final Map<String, MonsterDrop> monsterDrops = new HashMap<>();
     
+    // Maps to store custom monster data
+    private static Map<String, Integer> customThresholds = new HashMap<>();
+    private static Map<String, String> customDrops = new HashMap<>();
+    private static Map<String, Boolean> exemptMonsters = new HashMap<>();
+    
+    // Gson instance for serialization
+    private static final Gson gson = new Gson();
+    
     static {
         // Common low-level monsters
         monsterDrops.put("Goblin", new MonsterDrop("Goblin", "Goblin Champion Scroll", 1.0/5000.0));
@@ -103,12 +122,91 @@ public class NpcKillThreshold {
     }
     
     /**
+     * Initialize the custom monster data from configuration
+     */
+    public static void loadCustomMonsters(ConfigManager configManager) {
+        // Load custom thresholds
+        String thresholdsJson = configManager.getConfiguration(CONFIG_GROUP, CUSTOM_THRESHOLDS_KEY);
+        if (thresholdsJson != null && !thresholdsJson.isEmpty()) {
+            Type type = new TypeToken<HashMap<String, Integer>>(){}.getType();
+            customThresholds = gson.fromJson(thresholdsJson, type);
+        }
+        
+        // Load custom drops
+        String dropsJson = configManager.getConfiguration(CONFIG_GROUP, CUSTOM_DROPS_KEY);
+        if (dropsJson != null && !dropsJson.isEmpty()) {
+            Type type = new TypeToken<HashMap<String, String>>(){}.getType();
+            customDrops = gson.fromJson(dropsJson, type);
+        }
+        
+        // Load exempt monsters
+        String exemptJson = configManager.getConfiguration(CONFIG_GROUP, EXEMPT_MONSTERS_KEY);
+        if (exemptJson != null && !exemptJson.isEmpty()) {
+            Type type = new TypeToken<HashMap<String, Boolean>>(){}.getType();
+            exemptMonsters = gson.fromJson(exemptJson, type);
+        }
+    }
+    
+    /**
+     * Add a new monster to the custom thresholds
+     */
+    public static void addCustomMonster(ConfigManager configManager, String npcName, String dropName, 
+                                        double dropRate, boolean isExempt) {
+        // Add the monster to the appropriate maps
+        if (isExempt) {
+            customThresholds.put(npcName, Integer.MAX_VALUE);
+            exemptMonsters.put(npcName, true);
+        } else {
+            // Calculate threshold
+            MonsterDrop drop = new MonsterDrop(npcName, dropName, dropRate);
+            customThresholds.put(npcName, drop.getKillThreshold());
+            exemptMonsters.put(npcName, false);
+        }
+        
+        // Store the drop name
+        customDrops.put(npcName, dropName);
+        
+        // Save to configuration
+        saveCustomMonsters(configManager);
+    }
+    
+    /**
+     * Save custom monster data to configuration
+     */
+    private static void saveCustomMonsters(ConfigManager configManager) {
+        // Save custom thresholds
+        String thresholdsJson = gson.toJson(customThresholds);
+        configManager.setConfiguration(CONFIG_GROUP, CUSTOM_THRESHOLDS_KEY, thresholdsJson);
+        
+        // Save custom drops
+        String dropsJson = gson.toJson(customDrops);
+        configManager.setConfiguration(CONFIG_GROUP, CUSTOM_DROPS_KEY, dropsJson);
+        
+        // Save exempt monsters
+        String exemptJson = gson.toJson(exemptMonsters);
+        configManager.setConfiguration(CONFIG_GROUP, EXEMPT_MONSTERS_KEY, exemptJson);
+    }
+    
+    /**
+     * Check if a monster is defined (either predefined or custom)
+     */
+    public static boolean isMonsterDefined(String npcName) {
+        return monsterDrops.containsKey(npcName) || customThresholds.containsKey(npcName);
+    }
+    
+    /**
      * Get the kill threshold for a specific NPC.
      * 
      * @param npcName The name of the NPC
      * @return The threshold, or default value (10) if not specifically defined
      */
     public static int getThreshold(String npcName) {
+        // Check custom thresholds first
+        if (customThresholds.containsKey(npcName)) {
+            return customThresholds.get(npcName);
+        }
+        
+        // Then check predefined thresholds
         return monsterDrops.containsKey(npcName) 
             ? monsterDrops.get(npcName).getKillThreshold() 
             : 10;
@@ -121,6 +219,12 @@ public class NpcKillThreshold {
      * @return True if monster is exempt (can be killed infinitely), false otherwise
      */
     public static boolean isExempt(String npcName) {
+        // Check custom exempt monsters first
+        if (exemptMonsters.containsKey(npcName)) {
+            return exemptMonsters.get(npcName);
+        }
+        
+        // Then check predefined exemptions
         if (!monsterDrops.containsKey(npcName)) {
             return false; // Non-tracked monsters follow normal rules
         }
@@ -129,16 +233,20 @@ public class NpcKillThreshold {
     }
     
     /**
-     * Get the thresholds for all NPCs.
+     * Get the thresholds for all NPCs (predefined and custom).
      * 
      * @return A map of NPC names to kill thresholds
      */
     public static Map<String, Integer> getNpcThresholds() {
         Map<String, Integer> thresholds = new HashMap<>();
         
+        // Add predefined thresholds
         for (Map.Entry<String, MonsterDrop> entry : monsterDrops.entrySet()) {
             thresholds.put(entry.getKey(), entry.getValue().getKillThreshold());
         }
+        
+        // Add custom thresholds (will override predefined if there are duplicates)
+        thresholds.putAll(customThresholds);
         
         return thresholds;
     }
@@ -150,6 +258,46 @@ public class NpcKillThreshold {
      * @return A MonsterDrop object, or null if not found
      */
     public static MonsterDrop getMonsterDropInfo(String npcName) {
+        // Only handle predefined monsters with this method
         return monsterDrops.get(npcName);
+    }
+    
+    /**
+     * Get the name of the rarest drop for an NPC
+     * 
+     * @param npcName The name of the NPC
+     * @return The name of the rarest drop, or "Unknown" if not found
+     */
+    public static String getRarestDropName(String npcName) {
+        // Check custom drops first
+        if (customDrops.containsKey(npcName)) {
+            return customDrops.get(npcName);
+        }
+        
+        // Then check predefined drops
+        if (monsterDrops.containsKey(npcName)) {
+            return monsterDrops.get(npcName).getRarestDrop();
+        }
+        
+        return "Unknown";
+    }
+    
+    /**
+     * Reset all custom monster data
+     */
+    public static void resetCustomMonsters(ConfigManager configManager) {
+        customThresholds.clear();
+        customDrops.clear();
+        exemptMonsters.clear();
+        saveCustomMonsters(configManager);
+    }
+    
+    /**
+     * Get all custom monsters
+     * 
+     * @return A map of custom monster names to their drop names
+     */
+    public static Map<String, String> getCustomMonsters() {
+        return new HashMap<>(customDrops);
     }
 }
