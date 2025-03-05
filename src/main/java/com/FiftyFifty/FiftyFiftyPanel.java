@@ -341,8 +341,20 @@ public class FiftyFiftyPanel extends PluginPanel {
     }
 
     private void resetAllKills() {
-        killTracker.resetKills();
-        update();
+        // Create a confirmation dialog
+        int confirm = javax.swing.JOptionPane.showConfirmDialog(
+            this,
+            "Are you sure you want to reset all kill counts?",
+            "Confirm Reset",
+            javax.swing.JOptionPane.YES_NO_OPTION,
+            javax.swing.JOptionPane.WARNING_MESSAGE
+        );
+        
+        // Only reset if user confirmed
+        if (confirm == javax.swing.JOptionPane.YES_OPTION) {
+            killTracker.resetKills();
+            update();
+        }
     }
 
     private void openDashboard() {

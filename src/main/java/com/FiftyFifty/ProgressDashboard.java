@@ -557,9 +557,21 @@ public class ProgressDashboard extends JFrame
         resetButton.setFocusPainted(false);
         resetButton.setFont(FontManager.getRunescapeSmallFont());
         resetButton.addActionListener((ActionEvent e) -> {
-            killTracker.resetKills();
-            dispose();
-            open(); // Reopen with fresh data
+            // Create a confirmation dialog
+            int confirm = javax.swing.JOptionPane.showConfirmDialog(
+                this,
+                "Are you sure you want to reset all kill counts?",
+                "Confirm Reset",
+                javax.swing.JOptionPane.YES_NO_OPTION,
+                javax.swing.JOptionPane.WARNING_MESSAGE
+            );
+            
+            // Only reset if user confirmed
+            if (confirm == javax.swing.JOptionPane.YES_OPTION) {
+                killTracker.resetKills();
+                dispose();
+                open(); // Reopen with fresh data
+            }
         });
 
         buttonPanel.add(resetButton, BorderLayout.CENTER);
