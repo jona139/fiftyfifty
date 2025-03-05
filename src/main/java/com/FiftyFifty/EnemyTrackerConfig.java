@@ -30,16 +30,7 @@ public interface EnemyTrackerConfig extends Config
     )
     String dashboardOptions = "dashboardOptions";
     
-    @ConfigItem(
-        keyName = "showProgressIndicator",
-        name = "Show Progress Indicator",
-        description = "Display visual progress indicator on NPCs based on kill count",
-        section = displayOptions
-    )
-    default boolean showProgressIndicator()
-    {
-        return true;
-    }
+    // Progress indicator removed as it's no longer needed
     
     @ConfigItem(
         keyName = "showRecentKillOverlay",

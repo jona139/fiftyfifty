@@ -22,7 +22,6 @@ public class EnemyHighlighter extends Overlay
     private final EnemyTrackerConfig config;
     
     private static final Color GRAY_OUT_COLOR = new Color(60, 60, 60, 180);
-    private static final Color PROGRESS_COLOR = new Color(255, 140, 0, 120);
     
     @Inject
     public EnemyHighlighter(Client client, EnemyKillTracker killTracker, EnemyTrackerConfig config)
@@ -54,23 +53,17 @@ public class EnemyHighlighter extends Overlay
             int currentKills = killTracker.getKills(npcName);
             int killThreshold = NpcKillThreshold.getThreshold(npcName);
             
-            // Add progress visualization for NPCs being worked on
-            if (currentKills > 0) {
+            // Only apply visualization for NPCs that have reached threshold
+            if (currentKills >= killThreshold) {
                 // Get hull shape for more precise highlighting
                 Shape hull = npc.getConvexHull();
                 if (hull != null) {
-                    if (currentKills >= killThreshold) {
-                        // Reached threshold - fill with dark gray
-                        Composite originalComposite = graphics.getComposite();
-                        graphics.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 0.8f));
-                        graphics.setColor(GRAY_OUT_COLOR);
-                        graphics.fill(hull);
-                        graphics.setComposite(originalComposite);
-                    } else if (config.showProgressIndicator()) {
-                        // In progress - just outline with color
-                        graphics.setColor(PROGRESS_COLOR);
-                        graphics.draw(hull);
-                    }
+                    // Reached threshold - fill with dark gray
+                    Composite originalComposite = graphics.getComposite();
+                    graphics.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 0.8f));
+                    graphics.setColor(GRAY_OUT_COLOR);
+                    graphics.fill(hull);
+                    graphics.setComposite(originalComposite);
                 }
             }
         }

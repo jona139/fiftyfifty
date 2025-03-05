@@ -30,7 +30,6 @@ public class MenuEntrySwapper
         this.killTracker = killTracker;
         this.config = config;
         this.clientThread = clientThread;
-        log.info("MenuEntrySwapper initialized"); // DEBUG
     }
     
     /**
@@ -39,12 +38,8 @@ public class MenuEntrySwapper
     @Subscribe
     public void onMenuEntryAdded(MenuEntryAdded event)
     {
-        log.info("MenuEntryAdded - Option: {}, Target: {}, ID: {}, Type: {}", 
-            event.getOption(), event.getTarget(), event.getIdentifier(), event.getType()); // DEBUG
-
         if (!config.hideAttackOption())
         {
-            log.info("Attack hiding is disabled in config"); // DEBUG
             return;
         }
         
@@ -53,20 +48,11 @@ public class MenuEntrySwapper
         {
             return;
         }
-
-        log.info("Attack option detected: {}", option); // DEBUG
         
         // Try to find the NPC
         NPC npc = findNpcById(event.getIdentifier());
-        if (npc == null)
+        if (npc == null || npc.getName() == null)
         {
-            log.info("Could not find NPC with ID: {}", event.getIdentifier()); // DEBUG
-            return;
-        }
-        
-        if (npc.getName() == null)
-        {
-            log.info("NPC has no name: {}", npc); // DEBUG
             return;
         }
         
@@ -74,19 +60,14 @@ public class MenuEntrySwapper
         
         // Check if this monster is exempt from kill limits
         if (NpcKillThreshold.isExempt(npcName)) {
-            log.info("Monster is exempt from kill limits: {}", npcName); // DEBUG
             return; // Allow the attack option
         }
         
         int threshold = NpcKillThreshold.getThreshold(npcName);
         int currentKills = killTracker.getKills(npcName);
         
-        log.info("NPC: {}, Kills: {}, Threshold: {}", npcName, currentKills, threshold); // DEBUG
-        
         if (killTracker.hasReachedThreshold(npcName, threshold))
         {
-            log.info("NPC has reached threshold, modifying menu entries"); // DEBUG
-            
             // Remove all attack options for this NPC
             MenuEntry[] menuEntries = client.getMenuEntries();
             for (MenuEntry entry : menuEntries)
@@ -94,13 +75,10 @@ public class MenuEntrySwapper
                 if (entry.getIdentifier() == event.getIdentifier() && 
                     isAttackOption(entry.getOption()))
                 {
-                    log.info("Removing menu entry: {}", entry.getOption()); // DEBUG
                     entry.setOption("");
                     entry.setTarget("");
                 }
             }
-            
-            log.info("Removed attack option for maxed mob: {}", npcName); // DEBUG
         }
     }
     
@@ -110,12 +88,8 @@ public class MenuEntrySwapper
     @Subscribe
     public void onMenuOptionClicked(MenuOptionClicked event)
     {
-        log.info("MenuOptionClicked - Option: {}, Target: {}, ID: {}, MenuAction: {}", 
-            event.getMenuOption(), event.getMenuTarget(), event.getId(), event.getMenuAction()); // DEBUG
-
         if (!config.hideAttackOption())
         {
-            log.info("Attack hiding is disabled in config"); // DEBUG
             return;
         }
 
@@ -123,8 +97,6 @@ public class MenuEntrySwapper
         String option = event.getMenuOption().toLowerCase();
         MenuAction action = event.getMenuAction();
         int id = event.getId();
-        
-        log.info("Processing click - Option: {}, Action: {}, ID: {}", option, action, id); // DEBUG
         
         // Check if this is an NPC interaction
         boolean isNpcAction = action == MenuAction.NPC_FIRST_OPTION || 
@@ -136,42 +108,32 @@ public class MenuEntrySwapper
         boolean isAttack = option.equals("attack") || option.equals("fight") || 
                           option.startsWith("cast");
         
-        log.info("Is NPC action: {}, Is attack: {}", isNpcAction, isAttack); // DEBUG
-        
         if (isNpcAction && isAttack)
         {
-            log.info("NPC attack detected: {} on ID {} with action {}", option, id, action); // DEBUG
-            
-            // We definitely want to get the right NPC here
+            // Try to find the NPC
             NPC npc = findNpcById(id);
             if (npc == null)
             {
-                log.info("Could not find NPC with ID: {}", id); // DEBUG
-                
                 // Fallback: try to find the NPC by target name
                 String targetName = event.getMenuTarget();
-                log.info("Trying to find NPC by target name: {}", targetName); // DEBUG
                 
                 for (NPC n : client.getNpcs())
                 {
                     if (n != null && n.getName() != null && targetName.contains(n.getName()))
                     {
                         npc = n;
-                        log.info("Found NPC by name: {}", n.getName()); // DEBUG
                         break;
                     }
                 }
                 
                 if (npc == null)
                 {
-                    log.info("Still could not find NPC, returning"); // DEBUG
                     return;
                 }
             }
             
             if (npc.getName() == null)
             {
-                log.info("NPC has no name: {}", npc); // DEBUG
                 return;
             }
             
@@ -179,19 +141,14 @@ public class MenuEntrySwapper
             
             // Check if this monster is exempt from kill limits
             if (NpcKillThreshold.isExempt(npcName)) {
-                log.info("Monster is exempt from kill limits: {}", npcName); // DEBUG
                 return; // Allow the attack to proceed
             }
             
             int threshold = NpcKillThreshold.getThreshold(npcName);
             int currentKills = killTracker.getKills(npcName);
             
-            log.info("NPC: {}, Kills: {}, Threshold: {}", npcName, currentKills, threshold); // DEBUG
-            
             if (killTracker.hasReachedThreshold(npcName, threshold))
             {
-                log.info("NPC has reached threshold, consuming event"); // DEBUG
-                
                 // Cancel the click and show a message
                 event.consume();
                 
@@ -202,20 +159,8 @@ public class MenuEntrySwapper
                         "You've already reached the kill threshold for " + npcName + ".",
                         null
                     );
-                    
-                    log.info("Added chat message about maxed threshold"); // DEBUG
                 });
-                
-                log.info("Blocked attack on maxed mob: {}", npcName); // DEBUG
             }
-            else 
-            {
-                log.info("NPC has NOT reached threshold yet"); // DEBUG
-            }
-        }
-        else
-        {
-            log.info("Not an NPC attack action"); // DEBUG
         }
     }
     
@@ -224,18 +169,14 @@ public class MenuEntrySwapper
      */
     private NPC findNpcById(int id)
     {
-        log.info("Looking for NPC with ID: {}", id); // DEBUG
-        
         for (NPC npc : client.getNpcs())
         {
             if (npc != null && npc.getIndex() == id)
             {
-                log.info("Found NPC: {} (Index: {})", npc.getName(), npc.getIndex()); // DEBUG
                 return npc;
             }
         }
         
-        log.info("No NPC found with ID: {}", id); // DEBUG
         return null;
     }
     
