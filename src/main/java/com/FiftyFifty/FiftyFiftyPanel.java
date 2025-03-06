@@ -553,8 +553,8 @@ public class FiftyFiftyPanel extends PluginPanel {
         // Clear existing list
         customMonstersListPanel.removeAll();
 
-        // Get custom monsters
-        Map<String, String> customMonsters = NpcKillThreshold.getCustomMonsters();
+        // Get custom monsters that aren't already predefined
+        Map<String, String> customMonsters = NpcKillThreshold.getUniqueCustomMonsters();
 
         // If no custom monsters
         if (customMonsters.isEmpty()) {
