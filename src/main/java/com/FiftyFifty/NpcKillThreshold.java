@@ -82,43 +82,12 @@ public class NpcKillThreshold {
     private static final Gson gson = new Gson();
     
     static {
-        // Common low-level monsters
-        monsterDrops.put("Goblin", new MonsterDrop("Goblin", "Goblin Champion Scroll", 1.0/5000.0));
-        monsterDrops.put("Imp", new MonsterDrop("Imp", "Imp Champion Scroll", 1.0/5000.0));
-        monsterDrops.put("Rat", new MonsterDrop("Rat", "Giant Rat Tail", 1.0/100.0));
+        // Non-exempt Monsters
+        monsterDrops.put("Goblin", new MonsterDrop("Goblin", "Grimy Dwarf Weed", 1.0/2731.0));
         
         // Exempt monsters - always drop the same items
         // Using special drop rate of -1 to indicate an exempt monster
         monsterDrops.put("Cow", new MonsterDrop("Cow", "Cowhide (Always drops)", -1));
-        monsterDrops.put("Chicken", new MonsterDrop("Chicken", "Raw chicken (Always drops)", -1));
-        
-        // Mid-level monsters
-        monsterDrops.put("Hill Giant", new MonsterDrop("Hill Giant", "Giant Key", 1.0/128.0));
-        monsterDrops.put("Moss Giant", new MonsterDrop("Moss Giant", "Bryophyta's Essence", 1.0/118.0));
-        monsterDrops.put("Skeleton", new MonsterDrop("Skeleton", "Skeleton Champion Scroll", 1.0/5000.0));
-        monsterDrops.put("Zombie", new MonsterDrop("Zombie", "Zombie Champion Scroll", 1.0/5000.0));
-        monsterDrops.put("Bandit", new MonsterDrop("Bandit", "Rogue's Purse", 1.0/150.0));
-        
-        // Higher level monsters
-        monsterDrops.put("Lesser Demon", new MonsterDrop("Lesser Demon", "Lesser Demon Champion Scroll", 1.0/5000.0));
-        monsterDrops.put("Greater Demon", new MonsterDrop("Greater Demon", "Greater Demon Champion Scroll", 1.0/5000.0));
-        monsterDrops.put("Black Demon", new MonsterDrop("Black Demon", "Black Demon Head", 1.0/6000.0));
-        monsterDrops.put("Hellhound", new MonsterDrop("Hellhound", "Smouldering Stone", 1.0/32768.0));
-        monsterDrops.put("Abyssal Demon", new MonsterDrop("Abyssal Demon", "Abyssal Whip", 1.0/512.0));
-        
-        // Dragons
-        monsterDrops.put("Blue Dragon", new MonsterDrop("Blue Dragon", "Draconic Visage", 1.0/10000.0));
-        monsterDrops.put("Red Dragon", new MonsterDrop("Red Dragon", "Draconic Visage", 1.0/10000.0));
-        monsterDrops.put("Black Dragon", new MonsterDrop("Black Dragon", "Draconic Visage", 1.0/5000.0));
-        monsterDrops.put("Green Dragon", new MonsterDrop("Green Dragon", "Draconic Visage", 1.0/10000.0));
-        
-        // Bosses (higher thresholds)
-        monsterDrops.put("King Black Dragon", new MonsterDrop("King Black Dragon", "Dragon Pickaxe", 1.0/1500.0));
-        monsterDrops.put("Kalphite Queen", new MonsterDrop("Kalphite Queen", "Dragon Chain Body", 1.0/128.0));
-        monsterDrops.put("Giant Mole", new MonsterDrop("Giant Mole", "Baby Mole Pet", 1.0/3000.0));
-        monsterDrops.put("Dagannoth Rex", new MonsterDrop("Dagannoth Rex", "Berserker Ring", 1.0/128.0));
-        monsterDrops.put("Dagannoth Prime", new MonsterDrop("Dagannoth Prime", "Seers Ring", 1.0/128.0));
-        monsterDrops.put("Dagannoth Supreme", new MonsterDrop("Dagannoth Supreme", "Archers Ring", 1.0/128.0));
     }
     
     /**
