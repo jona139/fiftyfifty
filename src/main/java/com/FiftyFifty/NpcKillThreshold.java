@@ -88,6 +88,13 @@ public class NpcKillThreshold {
         // Exempt monsters - always drop the same items
         // Using special drop rate of -1 to indicate an exempt monster
         monsterDrops.put("Cow", new MonsterDrop("Cow", "Cowhide (Always drops)", -1));
+
+        // Generated custom monster definitions
+        monsterDrops.put("Rat", new MonsterDrop("Rat", "N/A", -1));
+        monsterDrops.put("Giant spider", new MonsterDrop("Giant spider", "N/A", -1));
+        monsterDrops.put("Chicken", new MonsterDrop("Chicken", "Feather (15)", 1.0/4.0));
+        monsterDrops.put("Man", new MonsterDrop("Man", "Grimy Dwarf Weed", 1.0/237.0));
+        monsterDrops.put("Woman", new MonsterDrop("Woman", "Grimy Dwarf Weed", 1.0/237.0));
     }
     
     /**
@@ -268,5 +275,60 @@ public class NpcKillThreshold {
      */
     public static Map<String, String> getCustomMonsters() {
         return new HashMap<>(customDrops);
+    }
+    
+    /**
+     * Export custom monsters as code that can be added to the static initializer
+     */
+    public static String exportCustomMonstersAsCode() {
+        StringBuilder codeBuilder = new StringBuilder();
+        codeBuilder.append("// Generated custom monster definitions\n");
+        
+        // Export the custom monsters in the format used in the static initializer
+        for (Map.Entry<String, String> entry : customDrops.entrySet()) {
+            String monsterName = entry.getKey();
+            String dropName = entry.getValue();
+            
+            // Skip monsters that are already in the predefined list
+            if (monsterDrops.containsKey(monsterName)) {
+                continue;
+            }
+            
+            // Get the threshold or exempt status
+            boolean isExempt = exemptMonsters.getOrDefault(monsterName, false);
+            int threshold = customThresholds.getOrDefault(monsterName, 10);
+            
+            // Calculate drop rate from threshold or use -1 for exempt monsters
+            double dropRate;
+            if (isExempt || threshold == Integer.MAX_VALUE) {
+                dropRate = -1;
+            } else {
+                // Reverse-engineer the drop rate from the threshold
+                // Using the formula: p = 1 - (0.5)^(1/n)
+                // Where n is the threshold and p is the drop rate
+                dropRate = 1 - Math.pow(0.5, 1.0 / threshold);
+            }
+            
+            // Format the line of code
+            codeBuilder.append("monsterDrops.put(\"")
+                      .append(monsterName)
+                      .append("\", new MonsterDrop(\"")
+                      .append(monsterName)
+                      .append("\", \"")
+                      .append(dropName)
+                      .append("\", ");
+                      
+            if (dropRate == -1) {
+                codeBuilder.append("-1");
+            } else {
+                // Format as 1.0/X.0 to match the original code style
+                double denominator = 1.0 / dropRate;
+                codeBuilder.append("1.0/").append(Math.round(denominator)).append(".0");
+            }
+            
+            codeBuilder.append("));\n");
+        }
+        
+        return codeBuilder.toString();
     }
 }
