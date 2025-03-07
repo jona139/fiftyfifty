@@ -88,6 +88,15 @@ public class NpcKillThreshold {
         // Exempt monsters - always drop the same items
         // Using special drop rate of -1 to indicate an exempt monster
         monsterDrops.put("Cow", new MonsterDrop("Cow", "Cowhide (Always drops)", -1));
+
+        // Generated custom monster definitions
+        monsterDrops.put("Imp", new MonsterDrop("Imp", "Potion", 1.0/128.0));
+        monsterDrops.put("Giant rat", new MonsterDrop("Giant rat", "N/A", -1));
+        monsterDrops.put("Rat", new MonsterDrop("Rat", "N/A", -1));
+        monsterDrops.put("Giant spider", new MonsterDrop("Giant spider", "N/A", -1));
+        monsterDrops.put("Chicken", new MonsterDrop("Chicken", "Feather (15)", 1.0/5.0));
+        monsterDrops.put("Man", new MonsterDrop("Man", "Grimy Dwarf Weed", 1.0/237.0));
+        monsterDrops.put("Woman", new MonsterDrop("Woman", "Grimy Dwarf Weed", 1.0/237.0));
     }
 
     /**
