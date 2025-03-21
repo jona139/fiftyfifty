@@ -90,6 +90,22 @@ public class NpcKillThreshold {
         monsterDrops.put("Cow", new MonsterDrop("Cow", "Cowhide (Always drops)", -1));
 
         // Generated custom monster definitions
+        monsterDrops.put("Witch's experiment (fourth form)", new MonsterDrop("Witch's experiment (fourth form)", "1", -1));
+        monsterDrops.put("Khazard warlord", new MonsterDrop("Khazard warlord", "1", -1));
+        monsterDrops.put("Sir Mordred", new MonsterDrop("Sir Mordred", "1", -1));
+        monsterDrops.put("Unicorn", new MonsterDrop("Unicorn", "1", -1));
+        monsterDrops.put("Witch's experiment (third form)", new MonsterDrop("Witch's experiment (third form)", "1", -1));
+        monsterDrops.put("Khazard Ogre", new MonsterDrop("Khazard Ogre", "1", -1));
+        monsterDrops.put("Grizzly bear", new MonsterDrop("Grizzly bear", "1", -1));
+        monsterDrops.put("Khazard Scorpion", new MonsterDrop("Khazard Scorpion", "na", -1));
+        monsterDrops.put("Giant bat", new MonsterDrop("Giant bat", "1", -1));
+        monsterDrops.put("Bouncer", new MonsterDrop("Bouncer", "1", -1));
+        monsterDrops.put("Witch's experiment", new MonsterDrop("Witch's experiment", "1", -1));
+        monsterDrops.put("Witch's experiment (second form)", new MonsterDrop("Witch's experiment (second form)", "1", -1));
+        monsterDrops.put("Count Draynor", new MonsterDrop("Count Draynor", "NA", -1));
+        monsterDrops.put("Lesser Demon", new MonsterDrop("Lesser Demon", "Grimy Dwarf Weed", 1.0/5461.0));
+        monsterDrops.put("Black bear", new MonsterDrop("Black bear", "1", -1));
+        monsterDrops.put("Black Knight Titan", new MonsterDrop("Black Knight Titan", "1", -1));
         monsterDrops.put("Twisted banshee", new MonsterDrop("Twisted banshee", "Mystic gloves", 1.0/257.0));
         monsterDrops.put("Banshee", new MonsterDrop("Banshee", "Mystic gloves (dark)", 1.0/513.0));
         monsterDrops.put("Lizardman", new MonsterDrop("Lizardman", "Xeric's talisman (inert)", 1.0/250.0));
@@ -125,7 +141,7 @@ public class NpcKillThreshold {
         monsterDrops.put("Gang boss", new MonsterDrop("Gang boss", "Rune scimitar", 1.0/81.0));
         monsterDrops.put("Brutal red dragon", new MonsterDrop("Brutal red dragon", "Rune platebody", 1.0/129.0));
         monsterDrops.put("Warped jelly", new MonsterDrop("Warped jelly", "Mithril boots", 1.0/65.0));
-        monsterDrops.put("Skeleton", new MonsterDrop("Skeleton", "Grimy dwarf weed", 1.0/273.0));
+        monsterDrops.put("Skeleton", new MonsterDrop("Skeleton", "Torstol Seed", 1.0/1650000.0));
         monsterDrops.put("Thermonuclear smoke devil", new MonsterDrop("Thermonuclear smoke devil", "Dragon chainbody", 1.0/2000.0));
         monsterDrops.put("Cave crawler", new MonsterDrop("Cave crawler", "Bronze boots", 1.0/129.0));
         monsterDrops.put("Crawling hand", new MonsterDrop("Crawling hand", "Teal gloves", 1.0/65.0));
