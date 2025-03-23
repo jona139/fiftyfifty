@@ -25,23 +25,43 @@ import net.runelite.client.ui.FontManager;
 import net.runelite.client.ui.components.FlatTextField;
 
 /**
- * Dialog for adding a new monster to the database
+ * Dialog for adding a new monster to the database or editing an existing one
  */
 @Slf4j
 public class NewMonsterDialog extends JDialog {
     
     private final String monsterName;
     private final NewMonsterCallback callback;
+    private final boolean isExistingMonster;
+    private final String currentDropName;
+    private final double currentDropRate;
+    private final boolean currentExempt;
     
     // UI components
     private JTextField dropNameField;
     private FlatTextField dropRateField;
     private JCheckBox exemptCheckbox;
     
+    /**
+     * Constructor for adding a new monster
+     */
     public NewMonsterDialog(Frame parent, String monsterName, NewMonsterCallback callback) {
-        super(parent, "Add New Monster", true);
+        this(parent, monsterName, callback, false, "", 0.0, false);
+    }
+    
+    /**
+     * Constructor for editing an existing monster
+     */
+    public NewMonsterDialog(Frame parent, String monsterName, NewMonsterCallback callback, 
+                           boolean isExistingMonster, String currentDropName, 
+                           double currentDropRate, boolean currentExempt) {
+        super(parent, isExistingMonster ? "Edit Monster" : "Add New Monster", true);
         this.monsterName = monsterName;
         this.callback = callback;
+        this.isExistingMonster = isExistingMonster;
+        this.currentDropName = currentDropName;
+        this.currentDropRate = currentDropRate;
+        this.currentExempt = currentExempt;
         
         setDefaultCloseOperation(JDialog.DISPOSE_ON_CLOSE);
         setResizable(false);
@@ -59,14 +79,22 @@ public class NewMonsterDialog extends JDialog {
         contentPanel.setBackground(ColorScheme.DARKER_GRAY_COLOR);
         
         // Title
-        JLabel titleLabel = new JLabel("New Monster Detected: " + monsterName);
+        String titleText = isExistingMonster 
+            ? "Edit Monster: " + monsterName
+            : "New Monster Detected: " + monsterName;
+        
+        JLabel titleLabel = new JLabel(titleText);
         titleLabel.setFont(FontManager.getRunescapeBoldFont());
         titleLabel.setForeground(Color.WHITE);
         titleLabel.setAlignmentX(JLabel.CENTER_ALIGNMENT);
         titleLabel.setBorder(new EmptyBorder(0, 0, 10, 0));
         
         // Description
-        JLabel descLabel = new JLabel("<html>Add this monster to the Fifty-Fifty database.<br>Please provide information about its rarest drop.</html>");
+        String descText = isExistingMonster
+            ? "<html>Update this monster in the Fifty-Fifty database.<br>You can modify its rarest drop information.</html>"
+            : "<html>Add this monster to the Fifty-Fifty database.<br>Please provide information about its rarest drop.</html>";
+        
+        JLabel descLabel = new JLabel(descText);
         descLabel.setFont(FontManager.getRunescapeSmallFont());
         descLabel.setForeground(Color.LIGHT_GRAY);
         descLabel.setAlignmentX(JLabel.CENTER_ALIGNMENT);
@@ -88,13 +116,25 @@ public class NewMonsterDialog extends JDialog {
         dropNameField = new JTextField(20);
         dropNameField.setFont(FontManager.getRunescapeSmallFont());
         
+        // If editing, set the current drop name
+        if (isExistingMonster) {
+            dropNameField.setText(currentDropName);
+        }
+        
         // Drop Rate
         JLabel dropRateLabel = new JLabel("Drop Rate (1/X):");
         dropRateLabel.setFont(FontManager.getRunescapeSmallFont());
         dropRateLabel.setForeground(Color.WHITE);
         
         dropRateField = new FlatTextField();
-        dropRateField.setText("128");
+        
+        // If editing and not exempt, calculate the denominator from the drop rate
+        if (isExistingMonster && !currentExempt && currentDropRate > 0) {
+            int denominator = (int) Math.round(1.0 / currentDropRate);
+            dropRateField.setText(String.valueOf(denominator));
+        } else {
+            dropRateField.setText("128");
+        }
         
         // Exempt checkbox
         JLabel exemptLabel = new JLabel("Exempt from kill limit:");
@@ -104,6 +144,11 @@ public class NewMonsterDialog extends JDialog {
         exemptCheckbox = new JCheckBox();
         exemptCheckbox.setBackground(ColorScheme.DARKER_GRAY_COLOR);
         exemptCheckbox.setToolTipText("Check if this monster should be exempt from kill limits (like cows)");
+        
+        // If editing, set the current exempt status
+        if (isExistingMonster) {
+            exemptCheckbox.setSelected(currentExempt);
+        }
         
         // Add components to form
         formPanel.add(dropNameLabel);
@@ -123,7 +168,8 @@ public class NewMonsterDialog extends JDialog {
         cancelButton.setFocusPainted(false);
         cancelButton.addActionListener(e -> dispose());
         
-        JButton addButton = new JButton("Add Monster");
+        String buttonText = isExistingMonster ? "Update Monster" : "Add Monster";
+        JButton addButton = new JButton(buttonText);
         addButton.setFocusPainted(false);
         addButton.addActionListener(e -> submitForm());
         

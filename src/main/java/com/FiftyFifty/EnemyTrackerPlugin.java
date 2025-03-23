@@ -29,7 +29,7 @@ import net.runelite.client.ui.ClientToolbar;
 import net.runelite.client.ui.NavigationButton;
 import net.runelite.client.ui.overlay.OverlayManager;
 import net.runelite.client.util.LinkBrowser;
-
+import javax.swing.JOptionPane;
 import java.awt.Color;
 import java.awt.Frame;
 import java.awt.Graphics2D;
@@ -223,9 +223,9 @@ public class EnemyTrackerPlugin extends Plugin
             log.error("Error loading pending monsters", e);
         }
     }
-    
+
     /**
-     * Handle a new monster that's not in the database
+     * Handle a new monster that's not in the database or edit an existing one
      */
     public void handleNewMonster(String npcName) {
         // Check if we've recently seen this monster to avoid repeated dialogs
@@ -236,34 +236,85 @@ public class EnemyTrackerPlugin extends Plugin
                 return;
             }
         }
-        
+
         // Mark this monster as recently seen
         recentNewMonsters.put(npcName, System.currentTimeMillis());
-        
+
+        // Check if this monster already exists in the database
+        final boolean isExistingMonster = NpcKillThreshold.isMonsterDefined(npcName);
+
+        // Declare variables before assigning values to make them effectively final
+        final String currentDropName;
+        final double currentDropRate;
+        final boolean currentExempt;
+
+        // If it's an existing monster, get its current data
+        if (isExistingMonster) {
+            currentDropName = NpcKillThreshold.getRarestDropName(npcName);
+            currentExempt = NpcKillThreshold.isExempt(npcName);
+
+            // Get the drop rate if possible
+            NpcKillThreshold.MonsterDrop dropInfo = NpcKillThreshold.getMonsterDropInfo(npcName);
+            if (dropInfo != null) {
+                // For predefined monsters
+                currentDropRate = dropInfo.getDropRate();
+            } else {
+                // For custom monsters
+                currentDropRate = NpcKillThreshold.getCustomDropRate(npcName);
+            }
+        } else {
+            // Default values for new monsters
+            currentDropName = "";
+            currentDropRate = 0.0;
+            currentExempt = false;
+        }
+
         // Create and show the dialog on the EDT
         SwingUtilities.invokeLater(() -> {
             // Use null for parent frame which will center it on screen
             Frame parentFrame = null;
-            
-            // Create the dialog
-            NewMonsterDialog dialog = new NewMonsterDialog(parentFrame, npcName, 
-                (monsterName, dropName, dropRate, isExempt) -> {
-                    // Add the monster to the database
-                    NpcKillThreshold.addCustomMonster(configManager, monsterName, dropName, dropRate, isExempt);
-                    
-                    // Update the panel
-                    SwingUtilities.invokeLater(() -> pluginPanel.update());
-                    
-                    // Inform the player
-                    clientThread.invoke(() -> {
-                        client.addChatMessage(
-                            net.runelite.api.ChatMessageType.GAMEMESSAGE,
-                            "",
-                            "Added " + monsterName + " to the Fifty-Fifty database.",
-                            null
-                        );
-                    });
+
+            // If the monster already exists, show a confirmation dialog first
+            if (isExistingMonster) {
+                int confirm = JOptionPane.showConfirmDialog(
+                        parentFrame,
+                        "Monster \"" + npcName + "\" already exists in the database.\nDo you want to edit its information?",
+                        "Monster Already Exists",
+                        JOptionPane.YES_NO_OPTION,
+                        JOptionPane.QUESTION_MESSAGE
+                );
+
+                // If the user doesn't want to edit, just return
+                if (confirm != JOptionPane.YES_OPTION) {
+                    return;
                 }
+            }
+
+            // Create the dialog with appropriate mode (edit or add)
+            NewMonsterDialog dialog = new NewMonsterDialog(
+                    parentFrame,
+                    npcName,
+                    (monsterName, dropName, dropRate, isExempt) -> {
+                        // Add or update the monster in the database
+                        NpcKillThreshold.addCustomMonster(configManager, monsterName, dropName, dropRate, isExempt);
+
+                        // Update the panel
+                        SwingUtilities.invokeLater(() -> pluginPanel.update());
+
+                        // Inform the player
+                        clientThread.invoke(() -> {
+                            client.addChatMessage(
+                                    net.runelite.api.ChatMessageType.GAMEMESSAGE,
+                                    "",
+                                    (isExistingMonster ? "Updated " : "Added ") + monsterName + " in the Fifty-Fifty database.",
+                                    null
+                            );
+                        });
+                    },
+                    isExistingMonster,
+                    currentDropName,
+                    currentDropRate,
+                    currentExempt
             );
             dialog.setVisible(true);
         });
@@ -730,39 +781,46 @@ public class EnemyTrackerPlugin extends Plugin
             progressDashboard.requestFocus();
         }
     }
-    
+
     /**
-     * Opens a dialog to manually add a new monster
+     * Opens a dialog to manually add a new monster or edit an existing one
      */
-    public void openAddMonsterDialog()
-    {
+    public void openAddMonsterDialog() {
         SwingUtilities.invokeLater(() -> {
             // Use null for parent frame which will center it on screen
             Frame parentFrame = null;
-            
+
             // Show an input dialog to get the monster name
             String monsterName = javax.swing.JOptionPane.showInputDialog(
-                parentFrame,
-                "Enter the monster name:",
-                "Add New Monster",
-                javax.swing.JOptionPane.QUESTION_MESSAGE
+                    parentFrame,
+                    "Enter the monster name:",
+                    "Add or Edit Monster",
+                    javax.swing.JOptionPane.QUESTION_MESSAGE
             );
-            
+
             if (monsterName != null && !monsterName.trim().isEmpty()) {
                 monsterName = monsterName.trim();
-                
+
                 // Check if the monster already exists
-                if (NpcKillThreshold.isMonsterDefined(monsterName)) {
-                    javax.swing.JOptionPane.showMessageDialog(
-                        parentFrame,
-                        "This monster is already defined in the database.",
-                        "Monster Already Exists",
-                        javax.swing.JOptionPane.INFORMATION_MESSAGE
+                boolean isExistingMonster = NpcKillThreshold.isMonsterDefined(monsterName);
+
+                if (isExistingMonster) {
+                    // Show a confirmation dialog
+                    int confirm = javax.swing.JOptionPane.showConfirmDialog(
+                            parentFrame,
+                            "This monster already exists in the database. Do you want to edit it?",
+                            "Monster Already Exists",
+                            javax.swing.JOptionPane.YES_NO_OPTION,
+                            javax.swing.JOptionPane.QUESTION_MESSAGE
                     );
-                    return;
+
+                    // If they don't want to edit, return
+                    if (confirm != javax.swing.JOptionPane.YES_OPTION) {
+                        return;
+                    }
                 }
-                
-                // Show the dialog to add the monster
+
+                // Show the dialog to add/edit the monster
                 final String finalName = monsterName;
                 handleNewMonster(finalName);
             }

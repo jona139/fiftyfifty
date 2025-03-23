@@ -217,7 +217,7 @@ public class NpcKillThreshold {
     }
 
     /**
-     * Add a new monster to the custom thresholds
+     * Add a new monster to the custom thresholds or update an existing one
      */
     public static void addCustomMonster(ConfigManager configManager, String npcName, String dropName,
                                         double dropRate, boolean isExempt) {
@@ -256,6 +256,35 @@ public class NpcKillThreshold {
         configManager.setConfiguration(CONFIG_GROUP, EXEMPT_MONSTERS_KEY, exemptJson);
     }
 
+    /**
+     * Calculate the drop rate for a custom monster based on its threshold
+     * This is the reverse of the calculation in MonsterDrop.calculateThreshold
+     *
+     * @param npcName Name of the monster
+     * @return The drop rate as a decimal (e.g., 0.0078125 for 1/128), or -1 for exempt monsters
+     */
+    public static double getCustomDropRate(String npcName) {
+        // Check if the monster is exempt
+        if (exemptMonsters.containsKey(npcName) && exemptMonsters.get(npcName)) {
+            return -1;
+        }
+
+        // Get the threshold
+        Integer threshold = customThresholds.get(npcName);
+        if (threshold == null) {
+            return 0;
+        }
+
+        // Special case for max value (exempt monsters)
+        if (threshold == Integer.MAX_VALUE) {
+            return -1;
+        }
+
+        // Reverse-engineer the drop rate from the threshold
+        // Using the formula: p = 1 - (0.5)^(1/n)
+        // Where n is the threshold and p is the drop rate
+        return 1 - Math.pow(0.5, 1.0 / threshold);
+    }
     /**
      * Check if a monster is defined (either predefined or custom)
      */
