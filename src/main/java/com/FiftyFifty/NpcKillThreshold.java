@@ -90,6 +90,27 @@ public class NpcKillThreshold {
         monsterDrops.put("Cow", new MonsterDrop("Cow", "Cowhide (Always drops)", -1));
 
         // Generated custom monster definitions
+        monsterDrops.put("Carnivorous chinchompa", new MonsterDrop("Carnivorous chinchompa", "1", -1));
+        monsterDrops.put("Ravager", new MonsterDrop("Ravager", "1", -1));
+        monsterDrops.put("Spinner", new MonsterDrop("Spinner", "1", -1));
+        monsterDrops.put("Splatter", new MonsterDrop("Splatter", "1", -1));
+        monsterDrops.put("Portal", new MonsterDrop("Portal", "1", -1));
+        monsterDrops.put("Crazy archaeologist", new MonsterDrop("Crazy archaeologist", "Odium Shard 2", 1.0/257.0));
+        monsterDrops.put("Shifter", new MonsterDrop("Shifter", "1", -1));
+        monsterDrops.put("Jaguar", new MonsterDrop("Jaguar", "1", -1));
+        monsterDrops.put("Brawler", new MonsterDrop("Brawler", "1", -1));
+        monsterDrops.put("Kolodion", new MonsterDrop("Kolodion", "1", -1));
+        monsterDrops.put("Torcher", new MonsterDrop("Torcher", "1", -1));
+        monsterDrops.put("Broodoo victim", new MonsterDrop("Broodoo victim", "1", -1));
+        monsterDrops.put("Chinchompa", new MonsterDrop("Chinchompa", "1", -1));
+        monsterDrops.put("Defiler", new MonsterDrop("Defiler", "1", -1));
+        monsterDrops.put("Branda the Fire Queen", new MonsterDrop("Branda the Fire Queen", "Fire element staff crown", 1.0/384.0));
+        monsterDrops.put("Eldric the Ice King", new MonsterDrop("Eldric the Ice King", "Ice Element Staff Crown", 1.0/384.0));
+        monsterDrops.put("Fire elemental", new MonsterDrop("Fire elemental", "1", -1));
+        monsterDrops.put("Ice elemental", new MonsterDrop("Ice elemental", "1", -1));
+        monsterDrops.put("Swordchick", new MonsterDrop("Swordchick", "Tea Flask", 1.0/11.0));
+        monsterDrops.put("Golem guard", new MonsterDrop("Golem guard", "1", -1));
+        monsterDrops.put("Arrav", new MonsterDrop("Arrav", "1", -1));
         monsterDrops.put("Earth elemental", new MonsterDrop("Earth elemental", "Grimy Dwarf Weed", 1.0/390.0));
         monsterDrops.put("Chaos Golem", new MonsterDrop("Chaos Golem", "Barronite Guard", 1.0/151.0));
         monsterDrops.put("Armoured zombie", new MonsterDrop("Armoured zombie", "Broken zombie axe", 1.0/801.0));

@@ -4,6 +4,8 @@ import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.GridLayout;
+import java.awt.FlowLayout;
+import java.awt.Frame;
 import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -35,10 +37,9 @@ import java.awt.Font;
 import javax.swing.JDialog;
 import javax.swing.JTextArea;
 import javax.swing.Timer;
-import java.awt.FlowLayout;
-import java.awt.Frame;
 import javax.swing.JLabel;
 import javax.swing.JScrollPane;
+import javax.swing.JTable;
 
 @Slf4j
 public class FiftyFiftyPanel extends PluginPanel {
@@ -188,7 +189,7 @@ public class FiftyFiftyPanel extends PluginPanel {
         pendingMonstersPanel.add(pendingButtonsPanel, BorderLayout.SOUTH);
 
         // Button panel
-        final JPanel buttonPanel = new JPanel(new GridLayout(4, 1, 0, 5));
+        final JPanel buttonPanel = new JPanel(new GridLayout(5, 1, 0, 5));
         buttonPanel.setOpaque(false);
 
         resetButton.setFont(FontManager.getRunescapeSmallFont());
@@ -209,10 +210,17 @@ public class FiftyFiftyPanel extends PluginPanel {
         exportButton.setFocusPainted(false);
         exportButton.addActionListener(e -> exportCustomMonsters());
 
+        // Add edit all kills button
+        ColorJButton editAllButton = new ColorJButton("Edit All Kill Counts", ColorScheme.DARKER_GRAY_COLOR);
+        editAllButton.setFont(FontManager.getRunescapeSmallFont());
+        editAllButton.setFocusPainted(false);
+        editAllButton.addActionListener(e -> openEditAllKillsDialog());
+
         buttonPanel.add(resetButton);
         buttonPanel.add(viewDashboardButton);
         buttonPanel.add(helpButton);
         buttonPanel.add(exportButton);
+        buttonPanel.add(editAllButton);
 
         // Error panel
         errorPanel = new PluginErrorPanel();
@@ -286,7 +294,7 @@ public class FiftyFiftyPanel extends PluginPanel {
             add(contentPanel, BorderLayout.CENTER);
 
             // Re-add button panel
-            final JPanel buttonPanel = new JPanel(new GridLayout(4, 1, 0, 5));
+            final JPanel buttonPanel = new JPanel(new GridLayout(5, 1, 0, 5));
             buttonPanel.setOpaque(false);
 
             buttonPanel.add(resetButton);
@@ -299,6 +307,13 @@ public class FiftyFiftyPanel extends PluginPanel {
             exportButton.setFocusPainted(false);
             exportButton.addActionListener(e -> exportCustomMonsters());
             buttonPanel.add(exportButton);
+
+            // Add edit all kills button
+            ColorJButton editAllButton = new ColorJButton("Edit All Kill Counts", ColorScheme.DARKER_GRAY_COLOR);
+            editAllButton.setFont(FontManager.getRunescapeSmallFont());
+            editAllButton.setFocusPainted(false);
+            editAllButton.addActionListener(e -> openEditAllKillsDialog());
+            buttonPanel.add(editAllButton);
 
             add(buttonPanel, BorderLayout.SOUTH);
         } else {
@@ -375,8 +390,11 @@ public class FiftyFiftyPanel extends PluginPanel {
             return;
         }
 
-        // Create progress bars
+        // Create progress bars with edit buttons
         for (MobProgress mob : inProgressMobs) {
+            JPanel mobPanel = new JPanel(new BorderLayout(5, 0));
+            mobPanel.setOpaque(false);
+
             ProgressBar progressBar = new ProgressBar();
             progressBar.setMaximumValue(mob.getThreshold());
             progressBar.setValue(mob.getKills());
@@ -399,7 +417,16 @@ public class FiftyFiftyPanel extends PluginPanel {
                 progressBar.setForeground(Color.GREEN);
             }
 
-            progressBarsPanel.add(progressBar);
+            // Add edit button
+            JButton editButton = new JButton("Edit");
+            editButton.setFont(FontManager.getRunescapeSmallFont());
+            editButton.setFocusPainted(false);
+            editButton.setPreferredSize(new Dimension(40, 20));
+            editButton.addActionListener(e -> editMonsterKills(mob.getName()));
+
+            mobPanel.add(progressBar, BorderLayout.CENTER);
+            mobPanel.add(editButton, BorderLayout.EAST);
+            progressBarsPanel.add(mobPanel);
         }
     }
 
@@ -607,7 +634,14 @@ public class FiftyFiftyPanel extends PluginPanel {
                 infoPanel.add(killsLabel);
             }
 
+            // Add edit button
+            JButton editButton = new JButton("Edit");
+            editButton.setFont(FontManager.getRunescapeSmallFont());
+            editButton.setFocusPainted(false);
+            editButton.addActionListener(e -> editMonsterKills(monsterName));
+
             monsterPanel.add(infoPanel, BorderLayout.CENTER);
+            monsterPanel.add(editButton, BorderLayout.EAST);
             customMonstersListPanel.add(monsterPanel);
         }
     }
@@ -744,6 +778,146 @@ public class FiftyFiftyPanel extends PluginPanel {
         JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
         buttonPanel.setOpaque(false);
         buttonPanel.add(copyButton);
+        panel.add(buttonPanel, BorderLayout.SOUTH);
+
+        dialog.setContentPane(panel);
+        dialog.setVisible(true);
+    }
+
+    /**
+     * Edit kills for a specific monster
+     */
+    private void editMonsterKills(String monsterName) {
+        int currentKills = killTracker.getKills(monsterName);
+        int threshold = NpcKillThreshold.getThreshold(monsterName);
+
+        String input = javax.swing.JOptionPane.showInputDialog(
+                this,
+                "Enter new kill count for " + monsterName + " (max: " + threshold + "):",
+                "Edit Kill Count",
+                javax.swing.JOptionPane.QUESTION_MESSAGE
+        );
+
+        if (input != null && !input.trim().isEmpty()) {
+            try {
+                int newKills = Integer.parseInt(input.trim());
+                if (newKills < 0) {
+                    javax.swing.JOptionPane.showMessageDialog(
+                            this,
+                            "Kill count cannot be negative.",
+                            "Invalid Input",
+                            javax.swing.JOptionPane.ERROR_MESSAGE
+                    );
+                    return;
+                }
+
+                killTracker.setKills(monsterName, newKills);
+                update();
+            } catch (NumberFormatException e) {
+                javax.swing.JOptionPane.showMessageDialog(
+                        this,
+                        "Please enter a valid number.",
+                        "Invalid Input",
+                        javax.swing.JOptionPane.ERROR_MESSAGE
+                );
+            }
+        }
+    }
+
+    /**
+     * Open dialog to edit all kill counts
+     */
+    private void openEditAllKillsDialog() {
+        // Create dialog
+        JDialog dialog = new JDialog((Frame) null, "Edit All Kill Counts", true);
+        dialog.setSize(500, 600);
+        dialog.setLocationRelativeTo(this);
+
+        JPanel panel = new JPanel(new BorderLayout(0, 10));
+        panel.setBorder(new EmptyBorder(10, 10, 10, 10));
+        panel.setBackground(ColorScheme.DARK_GRAY_COLOR);
+
+        // Instructions
+        JLabel instructionsLabel = new JLabel("Edit kill counts for all tracked monsters:");
+        instructionsLabel.setForeground(Color.WHITE);
+        panel.add(instructionsLabel, BorderLayout.NORTH);
+
+        // Create table
+        String[] columnNames = {"Monster", "Current Kills", "Max Kills", "New Kills"};
+        Map<String, Integer> allKills = killTracker.getAllKills();
+
+        // Get all monsters that have been tracked
+        List<String> monsterList = new ArrayList<>(allKills.keySet());
+        monsterList.sort(String.CASE_INSENSITIVE_ORDER);
+
+        Object[][] data = new Object[monsterList.size()][4];
+        for (int i = 0; i < monsterList.size(); i++) {
+            String monster = monsterList.get(i);
+            int kills = allKills.get(monster);
+            int threshold = NpcKillThreshold.getThreshold(monster);
+
+            data[i][0] = monster;
+            data[i][1] = kills;
+            data[i][2] = NpcKillThreshold.isExempt(monster) ? "∞" : threshold;
+            data[i][3] = kills; // Default to current value
+        }
+
+        JTable table = new JTable(data, columnNames) {
+            @Override
+            public boolean isCellEditable(int row, int column) {
+                return column == 3; // Only the "New Kills" column is editable
+            }
+
+            @Override
+            public Class<?> getColumnClass(int column) {
+                if (column == 1 || column == 3) {
+                    return Integer.class;
+                }
+                return String.class;
+            }
+        };
+
+        table.setRowHeight(25);
+        table.setFont(FontManager.getRunescapeSmallFont());
+        table.getTableHeader().setReorderingAllowed(false);
+        table.getTableHeader().setBackground(ColorScheme.DARKER_GRAY_COLOR);
+        table.getTableHeader().setForeground(Color.WHITE);
+        table.getTableHeader().setFont(FontManager.getRunescapeBoldFont());
+        table.setBackground(ColorScheme.DARKER_GRAY_COLOR);
+        table.setForeground(Color.WHITE);
+        table.setGridColor(ColorScheme.DARK_GRAY_COLOR);
+
+        JScrollPane scrollPane = new JScrollPane(table);
+        panel.add(scrollPane, BorderLayout.CENTER);
+
+        // Buttons
+        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        buttonPanel.setOpaque(false);
+
+        JButton cancelButton = new JButton("Cancel");
+        cancelButton.addActionListener(e -> dialog.dispose());
+
+        JButton saveButton = new JButton("Save Changes");
+        saveButton.addActionListener(e -> {
+            // Save all changes
+            for (int i = 0; i < table.getRowCount(); i++) {
+                String monster = (String) table.getValueAt(i, 0);
+                Object newKillsObj = table.getValueAt(i, 3);
+
+                if (newKillsObj instanceof Integer) {
+                    int newKills = (Integer) newKillsObj;
+                    if (newKills >= 0) {
+                        killTracker.setKills(monster, newKills);
+                    }
+                }
+            }
+
+            update();
+            dialog.dispose();
+        });
+
+        buttonPanel.add(cancelButton);
+        buttonPanel.add(saveButton);
         panel.add(buttonPanel, BorderLayout.SOUTH);
 
         dialog.setContentPane(panel);

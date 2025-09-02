@@ -17,6 +17,8 @@ import net.runelite.api.events.GameStateChanged;
 import net.runelite.api.events.InteractingChanged;
 import net.runelite.api.events.MenuOpened;
 import net.runelite.api.events.NpcDespawned;
+import net.runelite.api.events.ChatMessage;
+import net.runelite.api.ChatMessageType;
 import net.runelite.client.callback.ClientThread;
 import net.runelite.client.config.ConfigGroup;
 import net.runelite.client.config.ConfigManager;
@@ -44,9 +46,9 @@ import java.util.concurrent.ConcurrentHashMap;
 
 @Slf4j
 @PluginDescriptor(
-    name = "Fifty-Fifty",
-    description = "Limits kills on monsters to make rare drops a 50/50 chance",
-    tags = {"combat", "overlay", "pve", "kill", "tracker", "fifty"}
+        name = "Fifty-Fifty",
+        description = "Limits kills on monsters to make rare drops a 50/50 chance",
+        tags = {"combat", "overlay", "pve", "kill", "tracker", "fifty"}
 )
 public class EnemyTrackerPlugin extends Plugin
 {
@@ -54,28 +56,28 @@ public class EnemyTrackerPlugin extends Plugin
     private static final String GITHUB_URL = "https://github.com/GamecubeJona/fifty-fifty";
     private static final String CONFIG_GROUP = "enemytracker";
     private static final String PENDING_MONSTERS_KEY = "pendingMonsters";
-    
+
     @Inject
     private Client client;
 
     @Inject
     private EnemyTrackerConfig config;
-    
+
     @Inject
     private OverlayManager overlayManager;
-    
+
     @Inject
     private ConfigManager configManager;
-    
+
     @Inject
     private ClientToolbar clientToolbar;
-    
+
     @Inject
     private EventBus eventBus;
-    
+
     @Inject
     private ClientThread clientThread;
-    
+
     private EnemyKillTracker killTracker;
     private EnemyHighlighter highlighter;
     private RecentKillOverlay recentKillOverlay;
@@ -83,17 +85,17 @@ public class EnemyTrackerPlugin extends Plugin
     private ProgressDashboard progressDashboard;
     private FiftyFiftyPanel pluginPanel;
     private NavigationButton navButton;
-    
+
     // Keep track of player interactions
     private final Map<NPC, Player> interactingMap = new HashMap<>();
-    
+
     // Keep track of recently seen new monsters to avoid showing multiple dialogs
     private final Map<String, Long> recentNewMonsters = new ConcurrentHashMap<>();
     private static final long NEW_MONSTER_COOLDOWN = 60000; // 60 seconds in milliseconds
-    
+
     // Map to store pending new monsters for batch processing
     private final Map<String, Long> pendingNewMonsters = new ConcurrentHashMap<>();
-    
+
     @Override
     protected void startUp() throws Exception
     {
@@ -101,43 +103,43 @@ public class EnemyTrackerPlugin extends Plugin
 
         // Initialize custom NPC thresholds
         NpcKillThreshold.loadCustomMonsters(configManager);
-        
+
         // Load pending monsters
         loadPendingMonsters();
-        
+
         killTracker = new EnemyKillTracker(configManager);
         highlighter = new EnemyHighlighter(client, killTracker, config);
         recentKillOverlay = new RecentKillOverlay(config, killTracker);
         menuEntrySwapper = new MenuEntrySwapper(client, killTracker, config, clientThread);
-        
+
         // Initialize the plugin panel
         pluginPanel = new FiftyFiftyPanel(this, killTracker, config);
-        
+
         // Create a simple icon instead of loading one
         final BufferedImage icon = createIcon();
-        
+
         // Create navigation button
         navButton = NavigationButton.builder()
-            .tooltip("Fifty-Fifty")
-            .icon(icon)
-            .priority(5)
-            .panel(pluginPanel)
-            .build();
-        
+                .tooltip("Fifty-Fifty")
+                .icon(icon)
+                .priority(5)
+                .panel(pluginPanel)
+                .build();
+
         // Add button to sidebar
         clientToolbar.addNavigation(navButton);
-        
+
         // Add overlays
         overlayManager.add(highlighter);
         overlayManager.add(recentKillOverlay);
-        
+
         // Register the MenuEntrySwapper
         eventBus.register(menuEntrySwapper);
-        
+
         // Update panel content
         pluginPanel.update();
     }
-    
+
     /**
      * Creates a simple icon for the plugin
      * @return BufferedImage to use as icon
@@ -147,18 +149,18 @@ public class EnemyTrackerPlugin extends Plugin
         // Create a 24x24 pixel image
         BufferedImage image = new BufferedImage(24, 24, BufferedImage.TYPE_INT_ARGB);
         Graphics2D g = image.createGraphics();
-        
+
         // Draw a simple icon - a circle with "50" in it
         g.setColor(new Color(80, 80, 80));
         g.fillOval(0, 0, 24, 24);
-        
+
         g.setColor(new Color(220, 220, 220));
         g.drawOval(0, 0, 23, 23);
-        
+
         g.setColor(Color.WHITE);
         g.setFont(g.getFont().deriveFont(10f));
         g.drawString("50", 5, 15);
-        
+
         g.dispose();
         return image;
     }
@@ -167,30 +169,30 @@ public class EnemyTrackerPlugin extends Plugin
     protected void shutDown() throws Exception
     {
         log.info("Fifty-Fifty plugin stopped!");
-        
+
         overlayManager.remove(highlighter);
         overlayManager.remove(recentKillOverlay);
-        
+
         if (progressDashboard != null && progressDashboard.isOpen())
         {
             progressDashboard.dispose();
         }
-        
+
         // Remove navigation button
         clientToolbar.removeNavigation(navButton);
-        
+
         // Unregister the MenuEntrySwapper
         eventBus.unregister(menuEntrySwapper);
-        
+
         interactingMap.clear();
         recentNewMonsters.clear();
-        
+
         // If there are pending monsters, save them to the config
         if (!pendingNewMonsters.isEmpty()) {
             savePendingMonsters();
         }
     }
-    
+
     /**
      * Save pending monsters to config
      */
@@ -209,11 +211,11 @@ public class EnemyTrackerPlugin extends Plugin
         if (json == null || json.isEmpty()) {
             return;
         }
-        
+
         try {
             Type type = new TypeToken<ArrayList<String>>(){}.getType();
             List<String> monsterNames = new Gson().fromJson(json, type);
-            
+
             // Add to the pending monsters map with current timestamp
             long now = System.currentTimeMillis();
             for (String name : monsterNames) {
@@ -319,14 +321,14 @@ public class EnemyTrackerPlugin extends Plugin
             dialog.setVisible(true);
         });
     }
-    
+
     /**
      * Get the pending new monsters
      */
     public Map<String, Long> getPendingNewMonsters() {
         return pendingNewMonsters;
     }
-    
+
     /**
      * Remove a monster from the pending list
      */
@@ -335,7 +337,7 @@ public class EnemyTrackerPlugin extends Plugin
         // Update the panel
         SwingUtilities.invokeLater(() -> pluginPanel.update());
     }
-    
+
     /**
      * Clear all pending monsters
      */
@@ -344,7 +346,135 @@ public class EnemyTrackerPlugin extends Plugin
         // Update the panel
         SwingUtilities.invokeLater(() -> pluginPanel.update());
     }
-    
+
+    @Subscribe
+    public void onChatMessage(ChatMessage event)
+    {
+        if (event.getType() != ChatMessageType.PUBLICCHAT &&
+                event.getType() != ChatMessageType.PRIVATECHAT &&
+                event.getType() != ChatMessageType.PRIVATECHATOUT)
+        {
+            return;
+        }
+
+        String message = event.getMessage().toLowerCase();
+
+        // Check for edit kill command: "!ff set <monster> <kills>"
+        if (message.startsWith("!ff set "))
+        {
+            String[] parts = event.getMessage().substring(8).split(" ");
+            if (parts.length >= 2)
+            {
+                try
+                {
+                    // Get the kill count (last part)
+                    int kills = Integer.parseInt(parts[parts.length - 1]);
+
+                    // Get the monster name (everything except the last part)
+                    StringBuilder monsterName = new StringBuilder();
+                    for (int i = 0; i < parts.length - 1; i++)
+                    {
+                        if (i > 0) monsterName.append(" ");
+                        monsterName.append(parts[i]);
+                    }
+
+                    String monster = monsterName.toString();
+
+                    // Set the kills
+                    killTracker.setKills(monster, kills);
+
+                    // Update the panel
+                    SwingUtilities.invokeLater(() -> pluginPanel.update());
+
+                    // Notify the player
+                    clientThread.invoke(() -> {
+                        client.addChatMessage(
+                                ChatMessageType.GAMEMESSAGE,
+                                "",
+                                "Set " + monster + " kills to " + kills,
+                                null
+                        );
+                    });
+                }
+                catch (NumberFormatException e)
+                {
+                    clientThread.invoke(() -> {
+                        client.addChatMessage(
+                                ChatMessageType.GAMEMESSAGE,
+                                "",
+                                "Invalid command. Use: !ff set <monster name> <kill count>",
+                                null
+                        );
+                    });
+                }
+            }
+        }
+        // Check for add kill command: "!ff add <monster> <kills>"
+        else if (message.startsWith("!ff add "))
+        {
+            String[] parts = event.getMessage().substring(8).split(" ");
+            if (parts.length >= 2)
+            {
+                try
+                {
+                    // Get the kill count to add (last part)
+                    int killsToAdd = Integer.parseInt(parts[parts.length - 1]);
+
+                    // Get the monster name (everything except the last part)
+                    StringBuilder monsterName = new StringBuilder();
+                    for (int i = 0; i < parts.length - 1; i++)
+                    {
+                        if (i > 0) monsterName.append(" ");
+                        monsterName.append(parts[i]);
+                    }
+
+                    String monster = monsterName.toString();
+
+                    // Add the kills
+                    int currentKills = killTracker.getKills(monster);
+                    killTracker.setKills(monster, currentKills + killsToAdd);
+
+                    // Update the panel
+                    SwingUtilities.invokeLater(() -> pluginPanel.update());
+
+                    // Notify the player
+                    clientThread.invoke(() -> {
+                        client.addChatMessage(
+                                ChatMessageType.GAMEMESSAGE,
+                                "",
+                                "Added " + killsToAdd + " kills to " + monster + " (total: " +
+                                        killTracker.getKills(monster) + ")",
+                                null
+                        );
+                    });
+                }
+                catch (NumberFormatException e)
+                {
+                    clientThread.invoke(() -> {
+                        client.addChatMessage(
+                                ChatMessageType.GAMEMESSAGE,
+                                "",
+                                "Invalid command. Use: !ff add <monster name> <kills to add>",
+                                null
+                        );
+                    });
+                }
+            }
+        }
+        // Help command
+        else if (message.equals("!ff help"))
+        {
+            clientThread.invoke(() -> {
+                client.addChatMessage(
+                        ChatMessageType.GAMEMESSAGE,
+                        "",
+                        "Fifty-Fifty commands: !ff set <monster> <kills> | !ff add <monster> <kills>",
+                        null
+                );
+            });
+        }
+    }
+
     /**
      * This handles the menu when it's fully opened (right-click).
      * We can use this to completely remove attack options.
@@ -356,14 +486,14 @@ public class EnemyTrackerPlugin extends Plugin
         {
             return;
         }
-        
+
         MenuEntry[] entries = event.getMenuEntries();
         boolean modified = false;
-        
+
         // Rebuild the entries array without attack options for maxed NPCs
         MenuEntry[] newEntries = new MenuEntry[entries.length];
         int index = 0;
-        
+
         for (MenuEntry entry : entries)
         {
             // Skip null entries
@@ -371,39 +501,39 @@ public class EnemyTrackerPlugin extends Plugin
             {
                 continue;
             }
-            
+
             String option = entry.getOption();
-            
+
             // For non-attack options, just keep them
             if (option == null || (!isAttackOption(option)))
             {
                 newEntries[index++] = entry;
                 continue;
             }
-            
+
             // For attack options, check if the NPC is maxed out
             int id = entry.getIdentifier();
             NPC npc = findNpcById(id);
-            
+
             if (npc == null || npc.getName() == null)
             {
                 // Keep the option if we can't identify the NPC
                 newEntries[index++] = entry;
                 continue;
             }
-            
+
             String npcName = npc.getName();
-            
+
             // Check if this monster is exempt from kill limits (like cows)
             if (NpcKillThreshold.isExempt(npcName)) {
                 // Exempt monsters can always be attacked
                 newEntries[index++] = entry;
                 continue;
             }
-            
+
             int threshold = NpcKillThreshold.getThreshold(npcName);
             int currentKills = killTracker.getKills(npcName);
-            
+
             // If we've reached the threshold, skip this attack option
             if (currentKills >= threshold)
             {
@@ -417,7 +547,7 @@ public class EnemyTrackerPlugin extends Plugin
                 newEntries[index++] = entry;
             }
         }
-        
+
         // If we modified any entries, update the menu
         if (modified)
         {
@@ -426,7 +556,7 @@ public class EnemyTrackerPlugin extends Plugin
             client.setMenuEntries(newEntries);
         }
     }
-    
+
     /**
      * When a ClientTick occurs, this is our last chance to modify menu entries
      * before they're displayed or processed.
@@ -438,14 +568,14 @@ public class EnemyTrackerPlugin extends Plugin
         {
             return;
         }
-        
+
         // Get the menu entries
         MenuEntry[] menuEntries = client.getMenuEntries();
         if (menuEntries == null || menuEntries.length == 0)
         {
             return;
         }
-        
+
         // Find menu entries with "Attack" as a left-click option for maxed NPCs
         boolean modified = false;
         MenuEntry[] newEntries = new MenuEntry[menuEntries.length];
@@ -457,71 +587,71 @@ public class EnemyTrackerPlugin extends Plugin
             {
                 continue;
             }
-            
+
             String option = entry.getOption();
             if (option == null)
             {
                 newEntries[index++] = entry;
                 continue;
             }
-            
+
             // Is it an attack option?
             if (!isAttackOption(option))
             {
                 newEntries[index++] = entry;
                 continue;
             }
-            
+
             // Is it on an NPC?
             MenuAction type = entry.getType();
-            if (type != MenuAction.NPC_FIRST_OPTION && 
-                type != MenuAction.NPC_SECOND_OPTION && 
-                type != MenuAction.NPC_THIRD_OPTION && 
-                type != MenuAction.NPC_FOURTH_OPTION && 
-                type != MenuAction.NPC_FIFTH_OPTION)
+            if (type != MenuAction.NPC_FIRST_OPTION &&
+                    type != MenuAction.NPC_SECOND_OPTION &&
+                    type != MenuAction.NPC_THIRD_OPTION &&
+                    type != MenuAction.NPC_FOURTH_OPTION &&
+                    type != MenuAction.NPC_FIFTH_OPTION)
             {
                 newEntries[index++] = entry;
                 continue;
             }
-            
+
             // Find the NPC
             int id = entry.getIdentifier();
             NPC npc = findNpcById(id);
-            
+
             if (npc == null || npc.getName() == null)
             {
                 newEntries[index++] = entry;
                 continue;
             }
-            
+
             String npcName = npc.getName();
-            
+
             // Check if this monster is exempt from kill limits
             if (NpcKillThreshold.isExempt(npcName)) {
                 // Allow attacking exempt monsters without restrictions
                 newEntries[index++] = entry;
                 continue;
             }
-            
+
             int threshold = NpcKillThreshold.getThreshold(npcName);
             int currentKills = killTracker.getKills(npcName);
-            
+
             // If the NPC has reached the threshold, replace the attack option with "Walk here" or skip it
             if (currentKills >= threshold)
             {
                 log.info("Blocking attack option for maxed mob: {}", npcName);
-                
+
                 // Find a "Talk-to" or "Examine" option for this NPC to use instead
                 boolean foundReplacement = false;
-                
+
                 for (MenuEntry altEntry : menuEntries)
                 {
-                    if (altEntry != null && 
-                        altEntry.getIdentifier() == id && 
-                        altEntry.getOption() != null &&
-                        (altEntry.getOption().equals("Talk-to") || 
-                         altEntry.getOption().equals("Examine") || 
-                         altEntry.getOption().equals("Pickpocket")))
+                    if (altEntry != null &&
+                            altEntry.getIdentifier() == id &&
+                            altEntry.getOption() != null &&
+                            (altEntry.getOption().equals("Talk-to") ||
+                                    altEntry.getOption().equals("Examine") ||
+                                    altEntry.getOption().equals("Pickpocket")))
                     {
                         // Replace the attack option with this alternate option
                         entry.setOption(altEntry.getOption());
@@ -532,7 +662,7 @@ public class EnemyTrackerPlugin extends Plugin
                         break;
                     }
                 }
-                
+
                 // If we didn't find a replacement, just use "Walk here"
                 if (!foundReplacement)
                 {
@@ -546,7 +676,7 @@ public class EnemyTrackerPlugin extends Plugin
                 newEntries[index++] = entry;
             }
         }
-        
+
         // If we modified any entries, update the menu
         if (modified)
         {
@@ -555,7 +685,7 @@ public class EnemyTrackerPlugin extends Plugin
             client.setMenuEntries(newEntries);
         }
     }
-    
+
     /**
      * Helper method to check if an option is attack-related
      */
@@ -565,13 +695,13 @@ public class EnemyTrackerPlugin extends Plugin
         {
             return false;
         }
-        
+
         option = option.toLowerCase();
-        return option.equals("attack") || 
-               option.equals("fight") || 
-               option.startsWith("cast");
+        return option.equals("attack") ||
+                option.equals("fight") ||
+                option.startsWith("cast");
     }
-    
+
     /**
      * Helper method to find NPC by ID
      */
@@ -586,7 +716,7 @@ public class EnemyTrackerPlugin extends Plugin
         }
         return null;
     }
-    
+
     @Subscribe
     public void onInteractingChanged(InteractingChanged event)
     {
@@ -594,43 +724,43 @@ public class EnemyTrackerPlugin extends Plugin
         {
             return;
         }
-        
+
         if (event.getSource() instanceof Player && event.getTarget() instanceof NPC)
         {
             Player player = (Player) event.getSource();
             NPC npc = (NPC) event.getTarget();
-            
+
             // Only track interactions for the local player
             if (player == client.getLocalPlayer())
             {
                 interactingMap.put(npc, player);
-                
+
                 // Check if this NPC has reached its kill threshold
                 if (npc.getName() != null)
                 {
                     String npcName = npc.getName();
-                    
+
                     // Skip exempt monsters (like cows that always drop the same items)
                     if (NpcKillThreshold.isExempt(npcName)) {
                         log.debug("Interacting with exempt monster: {}", npcName);
                         return;
                     }
-                    
+
                     int threshold = NpcKillThreshold.getThreshold(npcName);
                     int currentKills = killTracker.getKills(npcName);
-                    
+
                     // If the NPC has reached the kill threshold, warn the player
                     if (currentKills >= threshold)
                     {
                         log.info("Starting combat with maxed out NPC: {}", npcName);
-                        
+
                         // Show a message to the player
                         clientThread.invoke(() -> {
                             client.addChatMessage(
-                                net.runelite.api.ChatMessageType.GAMEMESSAGE,
-                                "",
-                                "Warning: You've already reached the kill threshold for " + npcName + ".",
-                                null
+                                    net.runelite.api.ChatMessageType.GAMEMESSAGE,
+                                    "",
+                                    "Warning: You've already reached the kill threshold for " + npcName + ".",
+                                    null
                             );
                         });
                     }
@@ -638,38 +768,38 @@ public class EnemyTrackerPlugin extends Plugin
             }
         }
     }
-    
+
     @Subscribe
     public void onNpcDespawned(NpcDespawned event)
     {
         NPC npc = event.getNpc();
-        
+
         // If the NPC is dead and was being interacted with by the player
         if (npc.isDead() && interactingMap.containsKey(npc))
         {
             Player player = interactingMap.get(npc);
-            
+
             // Check if the player who interacted with the NPC is the local player
             if (player == client.getLocalPlayer() && npc.getName() != null)
             {
                 String npcName = npc.getName();
                 killTracker.addKill(npcName);
-                
+
                 // Update the recent kill overlay
                 recentKillOverlay.setRecentKill(npcName);
-                
+
                 // Update the plugin panel
                 pluginPanel.update();
-                
-                log.debug("Killed {}, count: {}/{}", 
-                    npcName, 
-                    killTracker.getKills(npcName),
-                    NpcKillThreshold.getThreshold(npcName));
-                
+
+                log.debug("Killed {}, count: {}/{}",
+                        npcName,
+                        killTracker.getKills(npcName),
+                        NpcKillThreshold.getThreshold(npcName));
+
                 // Check if this is a new monster not in our database
                 if (!NpcKillThreshold.isMonsterDefined(npcName)) {
                     log.info("Detected new monster: {}", npcName);
-                    
+
                     // If batch mode is enabled, add to pending monsters
                     if (config.batchModeEnabled()) {
                         // Only add if not already in the pending list
@@ -678,10 +808,10 @@ public class EnemyTrackerPlugin extends Plugin
                             // Notify the player that a new monster was added to the pending list
                             clientThread.invoke(() -> {
                                 client.addChatMessage(
-                                    net.runelite.api.ChatMessageType.GAMEMESSAGE,
-                                    "",
-                                    "New monster detected: " + npcName + " (Added to pending list)",
-                                    null
+                                        net.runelite.api.ChatMessageType.GAMEMESSAGE,
+                                        "",
+                                        "New monster detected: " + npcName + " (Added to pending list)",
+                                        null
                                 );
                             });
                             // Update the panel to show the new pending monster
@@ -693,12 +823,12 @@ public class EnemyTrackerPlugin extends Plugin
                     }
                 }
             }
-            
+
             // Remove the NPC from the tracking map
             interactingMap.remove(npc);
         }
     }
-    
+
     @Subscribe
     public void onGameStateChanged(GameStateChanged gameStateChanged)
     {
@@ -706,7 +836,7 @@ public class EnemyTrackerPlugin extends Plugin
         {
             interactingMap.clear();
         }
-        
+
         if (config.resetKills())
         {
             killTracker.resetKills();
@@ -715,7 +845,7 @@ public class EnemyTrackerPlugin extends Plugin
             // Update the panel
             pluginPanel.update();
         }
-        
+
         if (config.resetCustomMonsters())
         {
             NpcKillThreshold.resetCustomMonsters(configManager);
@@ -726,14 +856,14 @@ public class EnemyTrackerPlugin extends Plugin
             // Inform the user
             clientThread.invoke(() -> {
                 client.addChatMessage(
-                    net.runelite.api.ChatMessageType.GAMEMESSAGE,
-                    "",
-                    "Reset all custom monster data.",
-                    null
+                        net.runelite.api.ChatMessageType.GAMEMESSAGE,
+                        "",
+                        "Reset all custom monster data.",
+                        null
                 );
             });
         }
-        
+
         // Check if dashboard should be opened
         if (config.openDashboard())
         {
@@ -742,7 +872,7 @@ public class EnemyTrackerPlugin extends Plugin
             configManager.setConfiguration(EnemyTrackerConfig.class.getAnnotation(ConfigGroup.class).value(), "openDashboard", false);
         }
     }
-    
+
     @Subscribe
     public void onConfigChanged(ConfigChanged event)
     {
@@ -752,7 +882,7 @@ public class EnemyTrackerPlugin extends Plugin
             pluginPanel.update();
         }
     }
-    
+
     /**
      * Opens the GitHub page for the plugin
      */
@@ -760,7 +890,7 @@ public class EnemyTrackerPlugin extends Plugin
     {
         LinkBrowser.browse(GITHUB_URL);
     }
-    
+
     /**
      * Opens the detailed progress dashboard
      */
@@ -771,7 +901,7 @@ public class EnemyTrackerPlugin extends Plugin
         {
             progressDashboard = new ProgressDashboard(killTracker, configManager);
         }
-        
+
         if (!progressDashboard.isOpen())
         {
             progressDashboard.open();
@@ -826,7 +956,7 @@ public class EnemyTrackerPlugin extends Plugin
             }
         });
     }
-    
+
     @Provides
     EnemyTrackerConfig provideConfig(ConfigManager configManager)
     {
